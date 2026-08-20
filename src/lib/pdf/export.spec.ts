@@ -52,15 +52,39 @@ function contentForPage(document: PDFDocument, pageIndex: number): string {
 		.join('\n');
 }
 
-function imageMatrices(content: string): number[][] {
-	return [...content.matchAll(/q\s+([\s\S]*?)\/\S+ Do\s+Q/g)].map((block) => {
-		const matrices = [
+type Matrix = [number, number, number, number, number, number];
+
+function matrixValues(match: RegExpMatchArray): Matrix {
+	return match.slice(1).map(Number) as Matrix;
+}
+
+function imageTransformBlocks(content: string): Matrix[][] {
+	return [...content.matchAll(/q\s+([\s\S]*?)\/\S+ Do\s+Q/g)].map((block) =>
+		[
 			...block[1].matchAll(/(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) cm/g)
-		].map((match) => match.slice(1).map(Number));
+		].map(matrixValues)
+	);
+}
+
+function imageMatrices(content: string): number[][] {
+	return imageTransformBlocks(content).map((matrices) => {
 		const translation = matrices[0];
 		const scale = matrices[2];
 		return [scale[0], scale[3], translation[4], translation[5]];
 	});
+}
+
+function textMatrices(content: string): Matrix[] {
+	return [
+		...content.matchAll(/(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) Tm/g)
+	].map(matrixValues);
+}
+
+async function sourceWithRotation(rotation: 0 | 90 | 180 | 270): Promise<Uint8Array> {
+	const document = await PDFDocument.create();
+	const page = document.addPage([612, 792]);
+	page.setRotation(degrees(rotation));
+	return document.save();
 }
 
 function imageResourceCount(document: PDFDocument, pageIndex: number): number {
@@ -319,33 +343,97 @@ describe('exportFlattenedPdf', () => {
 		expect(error).toMatchObject({ code: 'export-invalid-signature' });
 	});
 
-	it('places text using the source page rotation', async () => {
-		const sourceDocument = await PDFDocument.create();
-		const page = sourceDocument.addPage([612, 792]);
-		page.setRotation(degrees(90));
-		const source = await sourceDocument.save();
+	it.each([
+		[90, [0, 1, -1, 0, 156.066, 79.2]],
+		[180, [-1, 0, 0, -1, 550.8, 201.066]],
+		[270, [0, -1, 1, 0, 455.934, 712.8]]
+	] as const)(
+		'orients text with the visual viewport on a %i-degree page',
+		async (rotation, expectedMatrix) => {
+			const source = await sourceWithRotation(rotation);
+			const form = definition([
+				{
+					id: 'rotated-id',
+					name: 'rotated',
+					type: 'text',
+					page: 1,
+					rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+					required: true
+				}
+			]);
+
+			const output = await exportFlattenedPdf(source, form, {
+				rotated: { type: 'text', value: 'Rotated' }
+			});
+			const document = await PDFDocument.load(output);
+			const matrices = textMatrices(contentForPage(document, 0));
+
+			expect(matrices).toHaveLength(1);
+			expect(matrices[0]).toEqual(expectedMatrix.map((value) => expect.closeTo(value, 5)));
+		}
+	);
+
+	it.each([
+		[90, [1, 0, 0, 1, 183.6, 136.8], [0, 1, -1, 0, 0, 0], [122.4, 0, 0, 61.2, 0, 0]],
+		[180, [1, 0, 0, 1, 538.2, 237.6], [-1, 0, 0, -1, 0, 0], [158.4, 0, 0, 79.2, 0, 0]],
+		[270, [1, 0, 0, 1, 428.4, 655.2], [0, -1, 1, 0, 0, 0], [122.4, 0, 0, 61.2, 0, 0]]
+	] as const)(
+		'orients and aspect-fits a signature in the visual viewport on a %i-degree page',
+		async (rotation, expectedTranslation, expectedRotation, expectedScale) => {
+			const source = await sourceWithRotation(rotation);
+			const form = definition([
+				{
+					id: 'rotated-signature-id',
+					name: 'rotated_signature',
+					type: 'signature',
+					page: 1,
+					rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+					required: true
+				}
+			]);
+
+			const output = await exportFlattenedPdf(source, form, {
+				rotated_signature: { type: 'signature', image: TWO_BY_ONE_PNG }
+			});
+			const document = await PDFDocument.load(output);
+			const transforms = imageTransformBlocks(contentForPage(document, 0));
+
+			expect(transforms).toHaveLength(1);
+			expect(transforms[0][0]).toEqual(
+				expectedTranslation.map((value) => expect.closeTo(value, 5))
+			);
+			expect(transforms[0][1]).toEqual(expectedRotation.map((value) => expect.closeTo(value, 5)));
+			expect(transforms[0][2]).toEqual(expectedScale.map((value) => expect.closeTo(value, 5)));
+		}
+	);
+
+	it('keeps descender-bearing glyph bounds inside a tightly fitted field', async () => {
+		const source = await sourceWithRotation(0);
 		const form = definition([
 			{
-				id: 'rotated-id',
-				name: 'rotated',
+				id: 'descenders-id',
+				name: 'descenders',
 				type: 'text',
 				page: 1,
-				rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+				rect: { x: 0.1, y: 0.2, width: 0.5, height: 7.5 / 792 },
 				required: true
 			}
 		]);
 
 		const output = await exportFlattenedPdf(source, form, {
-			rotated: { type: 'text', value: 'Rotated' }
+			descenders: { type: 'text', value: 'gyp' }
 		});
 		const document = await PDFDocument.load(output);
 		const content = contentForPage(document, 0);
-		const matrix = content.match(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm/);
+		const sizeMatch = content.match(/\/Helvetica-\d+ ([\d.]+) Tf/);
+		const matrix = textMatrices(content)[0];
+		const fontSize = Number(sizeMatch?.[1]);
+		const glyphBottom = matrix[5] - fontSize * 0.207;
+		const glyphTop = matrix[5] + fontSize * 0.718;
 
-		expect(matrix).not.toBeNull();
-		expect(Number(matrix?.[1])).toBeCloseTo(122.4, 5);
-		expect(Number(matrix?.[2])).toBeGreaterThan(79.2);
-		expect(Number(matrix?.[2])).toBeLessThan(316.8);
+		expect(fontSize).toBeCloseTo(7.5 / 0.925, 5);
+		expect(glyphBottom).toBeGreaterThanOrEqual(626.1);
+		expect(glyphTop).toBeLessThanOrEqual(633.6);
 	});
 
 	it('shrinks text below 12pt while keeping it at or above 8pt when it fits', async () => {

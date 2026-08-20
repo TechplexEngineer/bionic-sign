@@ -1,6 +1,6 @@
-import { PDFDocument, type PDFImage, StandardFonts } from 'pdf-lib';
+import { degrees, PDFDocument, type PDFImage, StandardFonts } from 'pdf-lib';
 
-import { normalizedToPdf, type PdfPageDimensions } from '../coordinates.js';
+import { normalizedToPdf, type PdfPageDimensions, type PdfRect } from '../coordinates.js';
 import {
 	BionicSignError,
 	type ExportPdfOptions,
@@ -16,6 +16,13 @@ const MIN_TEXT_SIZE = 8;
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10] as const;
 const PNG_DATA_URL_PATTERN =
 	/^data:image\/png;base64,((?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?)$/;
+
+interface VisualFieldFrame {
+	width: number;
+	height: number;
+	rotation: ReturnType<typeof degrees>;
+	toPdf(x: number, y: number): { x: number; y: number };
+}
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
 	if (!signal?.aborted) return;
@@ -67,6 +74,45 @@ function pageDimensions(page: ReturnType<PDFDocument['getPage']>): PdfPageDimens
 		throw new RangeError(`Unsupported PDF page rotation: ${angle}`);
 	}
 	return { width, height, rotation: angle };
+}
+
+function visualFieldFrame(
+	rect: PdfRect,
+	rotation: PdfPageDimensions['rotation']
+): VisualFieldFrame {
+	switch (rotation) {
+		case 0:
+			return {
+				width: rect.width,
+				height: rect.height,
+				rotation: degrees(0),
+				toPdf: (x, y) => ({ x: rect.x + x, y: rect.y + y })
+			};
+		case 90:
+			return {
+				width: rect.height,
+				height: rect.width,
+				rotation: degrees(90),
+				toPdf: (x, y) => ({ x: rect.x + rect.width - y, y: rect.y + x })
+			};
+		case 180:
+			return {
+				width: rect.width,
+				height: rect.height,
+				rotation: degrees(180),
+				toPdf: (x, y) => ({
+					x: rect.x + rect.width - x,
+					y: rect.y + rect.height - y
+				})
+			};
+		case 270:
+			return {
+				width: rect.height,
+				height: rect.width,
+				rotation: degrees(270),
+				toPdf: (x, y) => ({ x: rect.x + y, y: rect.y + rect.height - x })
+			};
+	}
 }
 
 function decodePngDataUrl(field: FormField, dataUrl: string): Uint8Array {
@@ -159,13 +205,16 @@ export async function exportFlattenedPdf(
 		}
 
 		const page = pages[field.page - 1];
-		const rect = normalizedToPdf(field.rect, pageDimensions(page));
+		const dimensions = pageDimensions(page);
+		const rect = normalizedToPdf(field.rect, dimensions);
+		const frame = visualFieldFrame(rect, dimensions.rotation);
 
 		if (field.type === 'text' && isTextValue(value)) {
 			const widthAtOnePoint = font.widthOfTextAtSize(value.value, 1);
 			const heightAtOnePoint = font.heightAtSize(1, { descender: true });
-			const widthLimitedSize = widthAtOnePoint === 0 ? MAX_TEXT_SIZE : rect.width / widthAtOnePoint;
-			const fittedSize = Math.min(MAX_TEXT_SIZE, widthLimitedSize, rect.height / heightAtOnePoint);
+			const widthLimitedSize =
+				widthAtOnePoint === 0 ? MAX_TEXT_SIZE : frame.width / widthAtOnePoint;
+			const fittedSize = Math.min(MAX_TEXT_SIZE, widthLimitedSize, frame.height / heightAtOnePoint);
 
 			if (fittedSize < MIN_TEXT_SIZE) {
 				throw fieldError(
@@ -176,25 +225,32 @@ export async function exportFlattenedPdf(
 			}
 
 			const textHeight = font.heightAtSize(fittedSize, { descender: true });
+			const ascenderHeight = font.heightAtSize(fittedSize, { descender: false });
+			const descent = textHeight - ascenderHeight;
+			const baseline = (frame.height - textHeight) / 2 + descent;
+			const position = frame.toPdf(0, baseline);
 			page.drawText(value.value, {
-				x: rect.x,
-				y: rect.y + (rect.height - textHeight) / 2,
+				x: position.x,
+				y: position.y,
 				size: fittedSize,
-				font
+				font,
+				rotate: frame.rotation
 			});
 			continue;
 		}
 
 		if (field.type === 'signature' && isSignatureValue(value)) {
 			const image = await embedSignature(document, field, value.image, images, signal);
-			const scale = Math.min(rect.width / image.width, rect.height / image.height);
+			const scale = Math.min(frame.width / image.width, frame.height / image.height);
 			const width = image.width * scale;
 			const height = image.height * scale;
+			const position = frame.toPdf((frame.width - width) / 2, (frame.height - height) / 2);
 			page.drawImage(image, {
-				x: rect.x + (rect.width - width) / 2,
-				y: rect.y + (rect.height - height) / 2,
+				x: position.x,
+				y: position.y,
 				width,
-				height
+				height,
+				rotate: frame.rotation
 			});
 		}
 	}
