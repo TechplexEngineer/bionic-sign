@@ -37,6 +37,15 @@ describe('validateDefinition', () => {
 		).toThrow(/unique/i);
 	});
 
+	it('rejects duplicate field IDs', () => {
+		expect(() =>
+			validateDefinition({
+				version: 1,
+				fields: [field('shared-id', 'student'), field('shared-id', 'guardian')]
+			})
+		).toThrow(/unique/i);
+	});
+
 	it('rejects empty and malformed field names', () => {
 		expect(() => validateDefinition({ version: 1, fields: [field('a', '')] })).toThrow(/name/i);
 		expect(() => validateDefinition({ version: 1, fields: [field('a', '1student')] })).toThrow(
@@ -68,6 +77,16 @@ describe('validateDefinition', () => {
 		expect(input.fields[0].rect.x).toBe(0.1);
 		expect(parsed).not.toBe(input);
 		expect(parsed.fields).not.toBe(input.fields);
+	});
+
+	it('defaults an omitted required value to true', () => {
+		const input = field('a', 'student');
+		const { required: _required, ...fieldWithoutRequired } = input;
+
+		expect(validateDefinition({ version: 1, fields: [fieldWithoutRequired] })).toEqual({
+			version: 1,
+			fields: [input]
+		});
 	});
 });
 

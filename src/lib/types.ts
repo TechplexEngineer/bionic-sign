@@ -17,7 +17,7 @@ export interface FieldRect {
 }
 
 interface BaseField {
-	id: string;
+	readonly id: string;
 	name: string;
 	page: number;
 	rect: FieldRect;

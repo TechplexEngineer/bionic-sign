@@ -75,16 +75,17 @@ function readField(value: unknown, index: number): FormField {
 		throw new RangeError(`Field "${name}" page must be a one-based integer`);
 	}
 
-	if (typeof value.required !== 'boolean') {
+	const required = value.required === undefined ? true : value.required;
+	if (typeof required !== 'boolean') {
 		throw new TypeError(`Field "${name}" required must be a boolean`);
 	}
 
 	const rect = readRect(value.rect, name);
 	if (value.type === 'text') {
-		return { id, name, type: 'text', page, rect, required: value.required };
+		return { id, name, type: 'text', page, rect, required };
 	}
 	if (value.type === 'signature') {
-		return { id, name, type: 'signature', page, rect, required: value.required };
+		return { id, name, type: 'signature', page, rect, required };
 	}
 
 	throw new TypeError(`Field "${name}" type must be "text" or "signature"`);
@@ -102,12 +103,17 @@ export function validateDefinition(input: unknown): FormDefinition {
 	}
 
 	const names = new Set<string>();
+	const ids = new Set<string>();
 	const fields = input.fields.map((value, index) => {
 		const field = readField(value, index);
 		if (names.has(field.name)) {
 			throw new RangeError(`Field name "${field.name}" must be unique`);
 		}
 		names.add(field.name);
+		if (ids.has(field.id)) {
+			throw new RangeError(`Field id "${field.id}" must be unique`);
+		}
+		ids.add(field.id);
 		return field;
 	});
 
