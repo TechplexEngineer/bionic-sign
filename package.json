@@ -60,5 +60,10 @@
 	},
 	"keywords": [
 		"svelte"
-	]
+	],
+	"dependencies": {
+		"pdf-lib": "^1.17.1",
+		"pdfjs-dist": "^6.2.108",
+		"signature_pad": "^5.1.4"
+	}
 }
