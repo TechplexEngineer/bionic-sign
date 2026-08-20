@@ -68,6 +68,15 @@ describe('viewport coordinate transformations', () => {
 			/viewport dimensions/i
 		);
 	});
+
+	it('rejects non-finite viewport dimensions', () => {
+		expect(() =>
+			normalizedToViewport({ x: 0, y: 0, width: 1, height: 1 }, Number.NaN, 100)
+		).toThrow(/viewport dimensions/i);
+		expect(() => viewportToNormalized({ x: 0, y: 0, width: 1, height: 1 }, 100, Infinity)).toThrow(
+			/viewport dimensions/i
+		);
+	});
 });
 
 describe('PDF coordinate transformations', () => {

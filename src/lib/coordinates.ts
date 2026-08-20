@@ -16,7 +16,7 @@ export interface PdfPageDimensions {
 }
 
 function assertViewportDimensions(width: number, height: number): void {
-	if (width <= 0 || height <= 0) {
+	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
 		throw new RangeError('Viewport dimensions must be greater than zero.');
 	}
 }
