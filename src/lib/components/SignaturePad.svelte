@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type SignaturePadInstance from 'signature_pad';
 	import type { SignatureValue } from '../types.js';
 
@@ -9,13 +9,17 @@
 		onemptychange?: (empty: boolean) => void;
 	}
 
+	type SignaturePadConstructor = new (canvas: HTMLCanvasElement) => SignaturePadInstance;
+
 	let { value, onchange, onemptychange }: Props = $props();
 	const uid = $props.id();
 	let canvas: HTMLCanvasElement;
 	let signaturePad = $state<SignaturePadInstance>();
+	let signaturePadConstructor: SignaturePadConstructor | undefined;
 	let empty = $state(true);
 	let capturedValue: SignatureValue | undefined;
 	let appliedValueImage: string | undefined;
+	let externalImageLayer: HTMLCanvasElement | undefined;
 	let valueRevision = 0;
 
 	function setEmpty(nextEmpty: boolean, notify: boolean): void {
@@ -32,7 +36,7 @@
 		}
 
 		if (signaturePad.isEmpty()) {
-			return undefined;
+			return capturedValue;
 		}
 
 		return {
@@ -42,10 +46,15 @@
 	}
 
 	function handleStrokeEnd(): void {
+		valueRevision += 1;
 		capturedValue = readValue();
 		appliedValueImage = capturedValue?.image;
 		setEmpty(capturedValue === undefined, true);
 		onchange?.(capturedValue);
+	}
+
+	function handleStrokeBegin(): void {
+		valueRevision += 1;
 	}
 
 	function sizeCanvas(): void {
@@ -65,23 +74,46 @@
 		}
 
 		const points = signaturePad.toData();
-		const wasEmpty = signaturePad.isEmpty();
-		const image =
-			!wasEmpty && points.length === 0 ? signaturePad.toDataURL('image/png') : undefined;
-
 		sizeCanvas();
+		signaturePad.clear();
+		drawExternalImage();
 		if (points.length > 0) {
-			signaturePad.fromData(points);
-		} else if (image) {
-			void signaturePad.fromDataURL(image);
-		} else {
-			signaturePad.clear();
+			signaturePad.fromData(points, { clear: false });
 		}
+	}
+
+	function createExternalImageLayer(): HTMLCanvasElement {
+		const layer = document.createElement('canvas');
+		const ratio = Math.max(window.devicePixelRatio || 1, 1);
+		layer.width = canvas.width;
+		layer.height = canvas.height;
+		layer.getContext('2d')?.scale(ratio, ratio);
+		return layer;
+	}
+
+	function drawExternalImage(): void {
+		if (!externalImageLayer) return;
+
+		const ratio = Math.max(window.devicePixelRatio || 1, 1);
+		canvas
+			.getContext('2d')
+			?.drawImage(
+				externalImageLayer,
+				0,
+				0,
+				externalImageLayer.width,
+				externalImageLayer.height,
+				0,
+				0,
+				canvas.width / ratio,
+				canvas.height / ratio
+			);
 	}
 
 	async function applyValue(nextValue: SignatureValue | undefined): Promise<void> {
 		const pad = signaturePad;
-		if (!pad) {
+		const Constructor = signaturePadConstructor;
+		if (!pad || !Constructor) {
 			capturedValue = nextValue;
 			setEmpty(nextValue === undefined, false);
 			return;
@@ -98,45 +130,74 @@
 			}
 			capturedValue = undefined;
 			appliedValueImage = undefined;
+			externalImageLayer = undefined;
 			setEmpty(true, false);
 			return;
 		}
 
 		pad.clear();
-		await pad.fromDataURL(nextValue.image);
-		if (revision !== valueRevision || pad !== signaturePad) {
-			return;
-		}
+		externalImageLayer = undefined;
+		capturedValue = undefined;
+		setEmpty(true, false);
+		const layer = createExternalImageLayer();
+		const stagingPad = new Constructor(layer);
+		try {
+			await stagingPad.fromDataURL(nextValue.image);
+			if (revision !== valueRevision || pad !== signaturePad) {
+				return;
+			}
 
-		capturedValue = nextValue;
-		appliedValueImage = nextValue.image;
-		setEmpty(false, false);
+			pad.clear();
+			externalImageLayer = layer;
+			drawExternalImage();
+			capturedValue = nextValue;
+			appliedValueImage = nextValue.image;
+			setEmpty(false, false);
+		} finally {
+			stagingPad.off();
+		}
 	}
 
 	$effect(() => {
-		void applyValue(value);
+		const ready = signaturePad !== undefined;
+		const nextValue = value;
+		untrack(() => {
+			if (ready) {
+				void applyValue(nextValue);
+			} else {
+				capturedValue = nextValue;
+				setEmpty(nextValue === undefined, false);
+			}
+		});
 	});
 
 	onMount(() => {
 		let disposed = false;
 		let mountedPad: SignaturePadInstance | undefined;
+		let resizeObserver: ResizeObserver | undefined;
 
 		void import('signature_pad').then(({ default: SignaturePadConstructor }) => {
 			if (disposed) return;
 
 			sizeCanvas();
+			signaturePadConstructor = SignaturePadConstructor;
 			mountedPad = new SignaturePadConstructor(canvas);
+			mountedPad.addEventListener('beginStroke', handleStrokeBegin);
 			mountedPad.addEventListener('endStroke', handleStrokeEnd);
 			signaturePad = mountedPad;
-			window.addEventListener('resize', resizeCanvas);
+			resizeObserver = new ResizeObserver(resizeCanvas);
+			resizeObserver.observe(canvas);
 		});
 
 		return () => {
 			disposed = true;
-			window.removeEventListener('resize', resizeCanvas);
+			resizeObserver?.disconnect();
+			mountedPad?.removeEventListener('beginStroke', handleStrokeBegin);
 			mountedPad?.removeEventListener('endStroke', handleStrokeEnd);
 			mountedPad?.off();
 			signaturePad = undefined;
+			signaturePadConstructor = undefined;
+			externalImageLayer = undefined;
 		};
 	});
 
@@ -145,6 +206,7 @@
 		signaturePad?.clear();
 		capturedValue = undefined;
 		appliedValueImage = undefined;
+		externalImageLayer = undefined;
 		setEmpty(true, true);
 		onchange?.(undefined);
 	}
