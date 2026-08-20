@@ -17,6 +17,11 @@ const signaturePadMock = vi.hoisted(() => {
 			this.empty = true;
 			this.data = [];
 			delete this.canvas.dataset.image;
+			const context = this.canvas.getContext('2d');
+			context?.save();
+			context?.setTransform(1, 0, 0, 1, 0, 0);
+			context?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+			context?.restore();
 		});
 		readonly fromData = vi.fn((data: PointData) => {
 			this.data = data;
@@ -26,6 +31,14 @@ const signaturePadMock = vi.hoisted(() => {
 		readonly fromDataURL = vi.fn(async (image: string) => {
 			this.empty = false;
 			await loadGates.get(image)?.promise;
+			const context = this.canvas.getContext('2d');
+			context?.save();
+			context?.setTransform(1, 0, 0, 1, 0, 0);
+			if (context) {
+				context.fillStyle = image.includes('Zmlyc3Q=') ? '#ff0000' : '#0000ff';
+				context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+			}
+			context?.restore();
 			this.canvas.dataset.image = image;
 			completedLoads.push(image);
 		});
@@ -146,6 +159,10 @@ function imageLoader(image: string): InstanceType<typeof signaturePadMock.FakeSi
 	return loader;
 }
 
+function firstPixel(canvas: HTMLCanvasElement): number[] {
+	return Array.from(canvas.getContext('2d')?.getImageData(0, 0, 1, 1).data ?? []);
+}
+
 describe('SignaturePad', () => {
 	it('initializes only after mount and separates CSS size from high-DPI backing pixels', async () => {
 		expect(signaturePadMock.FakeSignaturePad.instances).toHaveLength(0);
@@ -226,6 +243,38 @@ describe('SignaturePad', () => {
 		await vi.waitFor(() => expect(imageLoader(first.image).off).toHaveBeenCalledOnce());
 
 		expect(result.component.toValue()).toEqual(second);
+	});
+
+	it('keeps the committed image visible across a deferred A-to-B-to-A replacement', async () => {
+		const first: SignatureValue = {
+			type: 'signature',
+			image: 'data:image/png;base64,Zmlyc3Q='
+		};
+		const second: SignatureValue = {
+			type: 'signature',
+			image: 'data:image/png;base64,c2Vjb25k'
+		};
+		const firstGate = deferred();
+		const secondGate = deferred();
+		signaturePadMock.loadGates.set(first.image, firstGate);
+		signaturePadMock.loadGates.set(second.image, secondGate);
+		const result = await renderReady({ value: first });
+		const canvas = result.container.querySelector('canvas');
+		if (!canvas) throw new Error('Expected a signature canvas');
+
+		await waitForImageLoadStarted(first.image);
+		firstGate.resolve();
+		await vi.waitFor(() => expect(result.component.toValue()).toEqual(first));
+		await vi.waitFor(() => expect(firstPixel(canvas)).toEqual([255, 0, 0, 255]));
+
+		await result.rerender({ value: second });
+		await waitForImageLoadStarted(second.image);
+		await result.rerender({ value: first });
+		secondGate.resolve();
+		await vi.waitFor(() => expect(imageLoader(second.image).off).toHaveBeenCalledOnce());
+
+		expect(result.component.toValue()).toEqual(first);
+		expect(firstPixel(canvas)).toEqual([255, 0, 0, 255]);
 	});
 
 	it('returns PNG data and emits changes after a pointer stroke', async () => {

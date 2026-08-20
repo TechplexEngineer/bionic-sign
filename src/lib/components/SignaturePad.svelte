@@ -55,6 +55,7 @@
 
 	function handleStrokeBegin(): void {
 		valueRevision += 1;
+		appliedValueImage = undefined;
 	}
 
 	function sizeCanvas(): void {
@@ -120,10 +121,6 @@
 		}
 
 		const revision = ++valueRevision;
-		if (nextValue?.image === appliedValueImage) {
-			return;
-		}
-
 		if (!nextValue) {
 			if (appliedValueImage !== undefined || !pad.isEmpty()) {
 				pad.clear();
@@ -135,10 +132,13 @@
 			return;
 		}
 
-		pad.clear();
-		externalImageLayer = undefined;
-		capturedValue = undefined;
-		setEmpty(true, false);
+		const matchingContentIsVisible =
+			capturedValue?.image === nextValue.image &&
+			(externalImageLayer !== undefined || !pad.isEmpty());
+		if (nextValue.image === appliedValueImage && matchingContentIsVisible) {
+			return;
+		}
+
 		const layer = createExternalImageLayer();
 		const stagingPad = new Constructor(layer);
 		try {
