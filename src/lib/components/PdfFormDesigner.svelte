@@ -53,6 +53,12 @@
 	let selectedField = $derived(localDefinition.fields.find(({ id }) => id === selectedFieldId));
 	let nameDraft = $derived(selectedField?.name ?? '');
 
+	$effect(() => {
+		const storedName = selectedField?.name ?? '';
+		nameDraft = storedName;
+		fieldNameError = undefined;
+	});
+
 	function issueFor(reason: unknown, fieldName?: string): ValidationIssue {
 		return {
 			code: 'invalid-field-name',

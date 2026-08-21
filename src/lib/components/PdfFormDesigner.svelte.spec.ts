@@ -216,6 +216,71 @@ describe('PdfFormDesigner', () => {
 		expect(changes.at(-1)?.fields.map(({ id }) => id)).toEqual(['signature-id']);
 	});
 
+	it('synchronizes a rejected name draft when a valid definition prop replaces it', async () => {
+		usePdf();
+		const source = new Uint8Array([1]);
+		const result = render(PdfFormDesigner, {
+			source,
+			definition: definition()
+		});
+		await expect
+			.element(page.getByRole('button', { name: 'Text field "student_name"' }))
+			.toBeVisible();
+		await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+		await page.getByRole('textbox', { name: 'Name' }).fill('parent_signature');
+		await expect.element(page.getByRole('alert')).toHaveTextContent('unique');
+
+		const replacement = definition();
+		replacement.fields[0].name = 'student_replaced';
+		await result.rerender({ source, definition: replacement });
+
+		await expect
+			.element(page.getByRole('textbox', { name: 'Name' }))
+			.toHaveValue('student_replaced');
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		expect(result.component.validate()).toEqual({ valid: true, issues: [] });
+	});
+
+	it('clears rejected name state when a required toggle commits the selected stored field', async () => {
+		usePdf();
+		const result = render(PdfFormDesigner, {
+			source: new Uint8Array([1]),
+			definition: definition()
+		});
+		await expect
+			.element(page.getByRole('button', { name: 'Text field "student_name"' }))
+			.toBeVisible();
+		await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+		await page.getByRole('textbox', { name: 'Name' }).fill('parent_signature');
+		await expect.element(page.getByRole('alert')).toHaveTextContent('unique');
+
+		await page.getByRole('checkbox', { name: 'Required' }).click();
+
+		await expect.element(page.getByRole('textbox', { name: 'Name' })).toHaveValue('student_name');
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		expect(result.component.validate()).toEqual({ valid: true, issues: [] });
+	});
+
+	it('clears rejected name state when an exact geometry edit commits the selected stored field', async () => {
+		usePdf();
+		const result = render(PdfFormDesigner, {
+			source: new Uint8Array([1]),
+			definition: definition()
+		});
+		await expect
+			.element(page.getByRole('button', { name: 'Text field "student_name"' }))
+			.toBeVisible();
+		await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+		await page.getByRole('textbox', { name: 'Name' }).fill('parent_signature');
+		await expect.element(page.getByRole('alert')).toHaveTextContent('unique');
+
+		await page.getByRole('spinbutton', { name: 'X' }).fill('0.25');
+
+		await expect.element(page.getByRole('textbox', { name: 'Name' })).toHaveValue('student_name');
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		expect(result.component.validate()).toEqual({ valid: true, issues: [] });
+	});
+
 	it('provides responsive drawer controls and customizable toolbar, loading, and error snippets', async () => {
 		const loadingBytes = deferred<Uint8Array>();
 		pdfMocks.loadPdfBytes.mockReturnValueOnce(loadingBytes.promise);
