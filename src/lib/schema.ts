@@ -87,8 +87,24 @@ function readField(value: unknown, index: number): FormField {
 	if (value.type === 'signature') {
 		return { id, name, type: 'signature', page, rect, required };
 	}
+	if (value.type === 'dropdown') {
+		if (!Array.isArray(value.options) || value.options.length === 0) {
+			throw new TypeError(`Field "${name}" dropdown options must be a non-empty array`);
+		}
+		const options = value.options.map((option, optionIndex) => {
+			const parsed = readString(option, `Field "${name}" option ${optionIndex}`).trim();
+			if (parsed.length === 0) {
+				throw new TypeError(`Field "${name}" dropdown options must not contain empty values`);
+			}
+			return parsed;
+		});
+		if (new Set(options).size !== options.length) {
+			throw new RangeError(`Field "${name}" dropdown options must be unique`);
+		}
+		return { id, name, type: 'dropdown', page, rect, required, options };
+	}
 
-	throw new TypeError(`Field "${name}" type must be "text" or "signature"`);
+	throw new TypeError(`Field "${name}" type must be "text", "dropdown", or "signature"`);
 }
 
 export function validateDefinition(input: unknown): FormDefinition {
@@ -132,7 +148,11 @@ export function nextFieldName(type: FormField['type'], fields: readonly FormFiel
 export function cloneDefinition(definition: FormDefinition): FormDefinition {
 	return {
 		version: definition.version,
-		fields: definition.fields.map((field) => ({ ...field, rect: { ...field.rect } }))
+		fields: definition.fields.map((field) =>
+			field.type === 'dropdown'
+				? { ...field, rect: { ...field.rect }, options: [...field.options] }
+				: { ...field, rect: { ...field.rect } }
+		)
 	};
 }
 
@@ -144,7 +164,7 @@ export function applyTextPrefill(
 	definition: FormDefinition,
 	prefill: Record<string, string>
 ): PrefillResult {
-	const values: Record<string, TextValue> = {};
+	const values = Object.create(null) as Record<string, TextValue>;
 	const diagnostics: BionicSignDiagnostic[] = [];
 	const fieldsByName = new Map(definition.fields.map((field) => [field.name, field]));
 

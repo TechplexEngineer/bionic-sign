@@ -114,6 +114,29 @@ describe('filler state commands', () => {
 		});
 	});
 
+	it('treats a selected dropdown option as a complete text value', () => {
+		const form: FormDefinition = {
+			version: 1,
+			fields: [
+				{
+					id: 'grade-id',
+					name: 'grade',
+					type: 'dropdown',
+					options: ['Freshman', 'Sophomore'],
+					page: 1,
+					rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+					required: true
+				}
+			]
+		};
+		const values = setTextValue({}, 'grade', 'Sophomore');
+
+		expect(validateFiller(form, values)).toEqual({ valid: true, issues: [] });
+		expect(submissionValues(form, values)).toEqual({
+			grade: { type: 'text', value: 'Sophomore' }
+		});
+	});
+
 	it('reports missing required fields in definition order and returns the first field', () => {
 		const values = setSignatureValue({}, 'second_signature', {
 			type: 'signature',

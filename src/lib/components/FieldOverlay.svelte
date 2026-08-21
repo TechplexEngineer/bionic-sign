@@ -37,7 +37,7 @@
 	let interaction: Interaction | undefined;
 	let pixelRect = $derived(normalizedToViewport(field.rect, width, height));
 	let fieldLabel = $derived(
-		`${field.type === 'text' ? 'Text' : 'Signature'} field "${field.name}"`
+		`${field.type === 'text' ? 'Text' : field.type === 'dropdown' ? 'Dropdown' : 'Signature'} field "${field.name}"`
 	);
 	let groupLabel = $derived(`Field "${field.name}" controls`);
 	let resizeLabel = $derived(`Resize field "${field.name}"`);

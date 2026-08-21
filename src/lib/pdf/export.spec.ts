@@ -155,6 +155,26 @@ describe('exportFlattenedPdf', () => {
 		expect(values).toEqual(originalValues);
 	});
 
+	it('flattens a selected dropdown option as text', async () => {
+		const form = definition([
+			{
+				id: 'grade-id',
+				name: 'grade',
+				type: 'dropdown',
+				options: ['Freshman', 'Sophomore'],
+				page: 1,
+				rect: { x: 0.1, y: 0.2, width: 0.4, height: 0.06 },
+				required: true
+			}
+		]);
+
+		const output = await exportFlattenedPdf(fixture, form, {
+			grade: { type: 'text', value: 'Sophomore' }
+		});
+
+		expect((await extractedText(output))[0]).toContain('Sophomore');
+	});
+
 	it('embeds independent PNG signatures and aspect-fits each image inside its field', async () => {
 		const form = definition([
 			{
@@ -386,9 +406,7 @@ describe('exportFlattenedPdf', () => {
 				}
 			]);
 
-			const result = await exportFlattenedPdf(fixture, form, {}).catch(
-				(reason: unknown) => reason
-			);
+			const result = await exportFlattenedPdf(fixture, form, {}).catch((reason: unknown) => reason);
 
 			if (required) {
 				expect(result).toBeInstanceOf(BionicSignError);
@@ -475,18 +493,8 @@ describe('exportFlattenedPdf', () => {
 	it.each([
 		[0, [1, 0, 0, 1, 50, 406.934], [1, 0, 0, 1, 50, 380], [1, 0, 0, 1, 0, 0]],
 		[90, [0, 1, -1, 0, 113.066, 170], [1, 0, 0, 1, 140, 190], [0, 1, -1, 0, 0, 0]],
-		[
-			180,
-			[-1, 0, 0, -1, 290, 253.066],
-			[1, 0, 0, 1, 290, 280],
-			[-1, 0, 0, -1, 0, 0]
-		],
-		[
-			270,
-			[0, -1, 1, 0, 226.934, 490],
-			[1, 0, 0, 1, 200, 470],
-			[0, -1, 1, 0, 0, 0]
-		]
+		[180, [-1, 0, 0, -1, 290, 253.066], [1, 0, 0, 1, 290, 280], [-1, 0, 0, -1, 0, 0]],
+		[270, [0, -1, 1, 0, 226.934, 490], [1, 0, 0, 1, 200, 470], [0, -1, 1, 0, 0, 0]]
 	] as const)(
 		'places text and signatures against the PDF.js-visible crop box on a %i-degree page',
 		async (rotation, expectedText, expectedImageTranslation, expectedImageRotation) => {
@@ -526,12 +534,8 @@ describe('exportFlattenedPdf', () => {
 			expect(image[0][0]).toEqual(
 				expectedImageTranslation.map((value) => expect.closeTo(value, 5))
 			);
-			expect(image[0][1]).toEqual(
-				expectedImageRotation.map((value) => expect.closeTo(value, 5))
-			);
-			expect(image[0][2]).toEqual(
-				[120, 0, 0, 60, 0, 0].map((value) => expect.closeTo(value, 5))
-			);
+			expect(image[0][1]).toEqual(expectedImageRotation.map((value) => expect.closeTo(value, 5)));
+			expect(image[0][2]).toEqual([120, 0, 0, 60, 0, 0].map((value) => expect.closeTo(value, 5)));
 		}
 	);
 
@@ -682,11 +686,9 @@ describe('exportFlattenedPdf', () => {
 	});
 
 	it('maps a generic pdf-lib load failure to a stable typed error', async () => {
-		const error = await exportFlattenedPdf(
-			new Uint8Array([1, 2, 3]),
-			definition([]),
-			{}
-		).catch((reason: unknown) => reason);
+		const error = await exportFlattenedPdf(new Uint8Array([1, 2, 3]), definition([]), {}).catch(
+			(reason: unknown) => reason
+		);
 
 		expect(error).toBeInstanceOf(BionicSignError);
 		expect(error).toMatchObject({ code: 'export-pdf-load' });

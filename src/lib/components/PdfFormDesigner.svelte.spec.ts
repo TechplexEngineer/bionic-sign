@@ -78,7 +78,9 @@ function invalidDefinition(
 	kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'
 ): FormDefinition {
 	const invalid = definition();
-	if (kind === 'duplicate-id') invalid.fields[1].id = invalid.fields[0].id;
+	if (kind === 'duplicate-id') {
+		(invalid.fields[1] as { id: string }).id = invalid.fields[0].id;
+	}
 	if (kind === 'duplicate-name') invalid.fields[1].name = invalid.fields[0].name;
 	if (kind === 'malformed-rect') {
 		invalid.fields[0].rect = { x: 0.9, y: 0.2, width: 0.3, height: 0.1 };
@@ -220,6 +222,27 @@ describe('PdfFormDesigner', () => {
 		await expect
 			.element(page.getByRole('button', { name: 'Text field "replacement"' }))
 			.toBeVisible();
+	});
+
+	it('adds a dropdown and configures its string options', async () => {
+		usePdf();
+		const changes: FormDefinition[] = [];
+		render(PdfFormDesigner, {
+			source: new Uint8Array([1]),
+			definition: { version: 1, fields: [] },
+			ondefinitionchange: (next) => changes.push(next)
+		});
+
+		await page.getByRole('button', { name: 'Add dropdown field' }).click();
+		await expect.element(page.getByRole('textbox', { name: 'Options' })).toHaveValue('Option 1');
+		await page.getByRole('textbox', { name: 'Options' }).fill('Freshman\nSophomore');
+
+		expect(changes.at(-1)?.fields[0]).toEqual(
+			expect.objectContaining({
+				type: 'dropdown',
+				options: ['Freshman', 'Sophomore']
+			})
+		);
 	});
 
 	it('edits every property, rejects duplicate names inline, deletes, and preserves geometry across zoom', async () => {

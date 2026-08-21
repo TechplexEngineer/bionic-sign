@@ -5,6 +5,7 @@ export const MIN_FIELD_SIZE = 0.02;
 
 const DEFAULT_FIELD_RECTS: Record<FormField['type'], FieldRect> = {
 	text: { x: 0.1, y: 0.1, width: 0.3, height: 0.1 },
+	dropdown: { x: 0.1, y: 0.1, width: 0.3, height: 0.1 },
 	signature: { x: 0.1, y: 0.1, width: 0.3, height: 0.15 }
 };
 
@@ -78,14 +79,19 @@ export function addField(
 	page: number,
 	rect: FieldRect = DEFAULT_FIELD_RECTS[type]
 ): FormDefinition {
-	const field: FormField = {
+	const base = {
 		id: globalThis.crypto.randomUUID(),
 		name: nextFieldName(type, definition.fields),
-		type,
 		page,
 		rect: constrainFieldRect(rect),
 		required: true
 	};
+	const field: FormField =
+		type === 'dropdown'
+			? { ...base, type: 'dropdown', options: ['Option 1'] }
+			: type === 'text'
+				? { ...base, type: 'text' }
+				: { ...base, type: 'signature' };
 
 	return validateDefinition({ version: 1, fields: [...definition.fields, field] });
 }
@@ -107,6 +113,19 @@ export function updateFieldRect(
 
 export function toggleRequired(definition: FormDefinition, id: string): FormDefinition {
 	return updateField(definition, id, (field) => ({ ...field, required: !field.required }));
+}
+
+export function updateDropdownOptions(
+	definition: FormDefinition,
+	id: string,
+	options: string[]
+): FormDefinition {
+	return updateField(definition, id, (field) => {
+		if (field.type !== 'dropdown') {
+			throw new TypeError(`Field "${field.name}" is not a dropdown`);
+		}
+		return { ...field, options: [...options] };
+	});
 }
 
 export function deleteField(definition: FormDefinition, id: string): FormDefinition {

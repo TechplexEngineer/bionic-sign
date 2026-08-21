@@ -79,15 +79,19 @@ function isSignatureValue(value: unknown): value is SignatureValue {
 }
 
 function isEmptyValue(field: FormField, value: unknown): boolean {
-	return field.type === 'text'
+	return field.type !== 'signature'
 		? isTextValue(value) && value.value.trim().length === 0
 		: isSignatureValue(value) && value.image.length === 0;
 }
 
 function assertValueType(field: FormField, value: unknown): void {
-	const matches = field.type === 'text' ? isTextValue(value) : isSignatureValue(value);
+	const matches = field.type === 'signature' ? isSignatureValue(value) : isTextValue(value);
 	if (!matches) {
-		throw fieldError('export-value-type', field, `requires a ${field.type} value`);
+		throw fieldError(
+			'export-value-type',
+			field,
+			`requires a ${field.type === 'signature' ? 'signature' : 'text'} value`
+		);
 	}
 }
 
@@ -221,7 +225,7 @@ export async function exportFlattenedPdf(
 
 	for (const field of definition.fields) {
 		throwIfAborted(signal);
-		const value = values[field.name];
+		const value = Object.hasOwn(values, field.name) ? values[field.name] : undefined;
 		if (value === undefined) {
 			if (field.required) {
 				throw fieldError('export-required-value', field, 'requires a value');
@@ -242,7 +246,7 @@ export async function exportFlattenedPdf(
 		const rect = normalizedToPdf(field.rect, dimensions);
 		const frame = visualFieldFrame(rect, dimensions.rotation);
 
-		if (field.type === 'text' && isTextValue(value)) {
+		if (field.type !== 'signature' && isTextValue(value)) {
 			const widthAtOnePoint = font.widthOfTextAtSize(value.value, 1);
 			const heightAtOnePoint = font.heightAtSize(1, { descender: true });
 			const widthLimitedSize =

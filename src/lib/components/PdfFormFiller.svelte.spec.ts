@@ -121,9 +121,13 @@ function emptyDefinition(): FormDefinition {
 	return { version: 1, fields: [] };
 }
 
-function invalidDefinition(kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'): FormDefinition {
+function invalidDefinition(
+	kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'
+): FormDefinition {
 	const invalid = definition();
-	if (kind === 'duplicate-id') invalid.fields[1].id = invalid.fields[0].id;
+	if (kind === 'duplicate-id') {
+		(invalid.fields[1] as { id: string }).id = invalid.fields[0].id;
+	}
 	if (kind === 'duplicate-name') invalid.fields[1].name = invalid.fields[0].name;
 	if (kind === 'malformed-rect') {
 		invalid.fields[0].rect = { x: 0.9, y: 0.2, width: 0.3, height: 0.1 };
@@ -147,6 +151,33 @@ afterEach(() => {
 });
 
 describe('PdfFormFiller', () => {
+	it('renders dropdown options and submits the selected string value', async () => {
+		const form: FormDefinition = {
+			version: 1,
+			fields: [
+				{
+					id: 'grade-id',
+					name: 'grade',
+					type: 'dropdown',
+					options: ['Freshman', 'Sophomore'],
+					page: 1,
+					rect: { x: 0.1, y: 0.1, width: 0.35, height: 0.08 },
+					required: true
+				}
+			]
+		};
+		const result = render(PdfFormFiller, { source: new Uint8Array([1]), definition: form });
+		await expect.element(page.getByRole('combobox', { name: 'grade' })).toBeVisible();
+
+		await page.getByRole('combobox', { name: 'grade' }).selectOptions('Sophomore');
+
+		expect(result.component.validate()).toEqual({ valid: true, issues: [] });
+		await result.component.exportPdf();
+		expect(pdfMocks.exportFlattenedPdf.mock.calls.at(-1)?.[2]).toEqual({
+			grade: { type: 'text', value: 'Sophomore' }
+		});
+	});
+
 	it('exports the same immutable URL-byte snapshot that PDF.js displayed', async () => {
 		const displayed = new Uint8Array([10, 20, 30]);
 		const changedResponse = new Uint8Array([90, 91, 92]);
@@ -156,9 +187,7 @@ describe('PdfFormFiller', () => {
 				urlLoads += 1;
 				return (urlLoads === 1 ? displayed : changedResponse).slice();
 			}
-			return input instanceof Uint8Array
-				? input.slice()
-				: new Uint8Array(input).slice();
+			return input instanceof Uint8Array ? input.slice() : new Uint8Array(input).slice();
 		});
 		const { getDocument } = usePdf();
 		const result = render(PdfFormFiller, {
