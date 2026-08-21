@@ -12,6 +12,9 @@
 		currentPage?: number;
 		zoom?: number;
 		overlay?: Snippet<[PdfPageOverlayContext]>;
+		loading?: Snippet;
+		error?: Snippet<[unknown]>;
+		onpagecountchange?: (pageCount: number) => void;
 		onerror?: (error: unknown) => void;
 	}
 
@@ -21,19 +24,22 @@
 		currentPage = $bindable(1),
 		zoom = $bindable(1),
 		overlay,
+		loading: loadingSnippet,
+		error: errorSnippet,
+		onpagecountchange,
 		onerror
 	}: Props = $props();
 	let pages = $state<PDFPageProxy[]>([]);
-	let loading = $state(true);
-	let error = $state<unknown>();
+	let isLoading = $state(true);
+	let loadError = $state<unknown>();
 
 	function messageFor(reason: unknown): string {
 		return reason instanceof Error ? reason.message : 'An unknown error occurred';
 	}
 
 	function reportError(reason: unknown): void {
-		error = reason;
-		loading = false;
+		loadError = reason;
+		isLoading = false;
 		onerror?.(reason);
 	}
 
@@ -52,9 +58,10 @@
 			}
 		}
 
-		loading = true;
-		error = undefined;
+		isLoading = true;
+		loadError = undefined;
 		pages = [];
+		onpagecountchange?.(0);
 
 		void (async () => {
 			try {
@@ -80,10 +87,11 @@
 				if (cancelled) return;
 
 				pages = loadedPages;
+				onpagecountchange?.(loadedPages.length);
 				if (currentPage < 1 || currentPage > document.numPages) {
 					currentPage = 1;
 				}
-				loading = false;
+				isLoading = false;
 			} catch (reason) {
 				if (!cancelled && !abortController.signal.aborted) {
 					reportError(reason);
@@ -100,10 +108,18 @@
 </script>
 
 <div class="pdf-viewer" data-current-page={currentPage} data-zoom={zoom}>
-	{#if loading}
-		<p role="status">Loading PDF…</p>
-	{:else if error}
-		<p role="alert">Unable to display PDF: {messageFor(error)}</p>
+	{#if isLoading}
+		{#if loadingSnippet}
+			{@render loadingSnippet()}
+		{:else}
+			<p role="status">Loading PDF…</p>
+		{/if}
+	{:else if loadError}
+		{#if errorSnippet}
+			{@render errorSnippet(loadError)}
+		{:else}
+			<p role="alert">Unable to display PDF: {messageFor(loadError)}</p>
+		{/if}
 	{:else}
 		{#each pages as pdfPage, index (pdfPage)}
 			<PdfPage
