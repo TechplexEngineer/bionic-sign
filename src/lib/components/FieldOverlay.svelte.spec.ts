@@ -37,12 +37,16 @@ describe('FieldOverlay', () => {
 	it('exposes labeled focusable controls and selects the field', async () => {
 		const onselect = vi.fn();
 		render(FieldOverlay, { field: textField(), width: 200, height: 100, onselect });
+		const group = page.getByRole('group', { name: 'Field "student_name" controls' });
 		const overlay = page.getByRole('button', { name: 'Text field "student_name"' });
+		const resize = page.getByRole('button', { name: 'Resize field "student_name"' });
 
+		await expect.element(group).toBeVisible();
 		await expect.element(overlay).toBeVisible();
-		await expect
-			.element(page.getByRole('button', { name: 'Resize field "student_name"' }))
-			.toBeVisible();
+		await expect.element(resize).toBeVisible();
+		expect(overlay.element().parentElement).toBe(group.element());
+		expect(resize.element().parentElement).toBe(group.element());
+		expect(overlay.element().contains(resize.element())).toBe(false);
 		expect((overlay.element() as HTMLElement).tabIndex).toBe(0);
 		(overlay.element() as HTMLElement).focus();
 		await expect.element(overlay).toHaveFocus();
@@ -52,6 +56,28 @@ describe('FieldOverlay', () => {
 
 		expect(onselect).toHaveBeenCalledWith('student-id');
 		await expect.element(overlay).toHaveFocus();
+	});
+
+	it('keeps dimensions unchanged when pointer movement exceeds right and bottom bounds', () => {
+		const onrectchange = vi.fn();
+		render(FieldOverlay, {
+			field: textField({ x: 0.8, y: 0.7, width: 0.2, height: 0.3 }),
+			width: 200,
+			height: 100,
+			onrectchange
+		});
+		const overlay = page.getByRole('button', { name: 'Text field "student_name"' }).element();
+		vi.spyOn(overlay, 'setPointerCapture').mockImplementation(() => undefined);
+
+		dispatchPointer(overlay, 'pointerdown', 160, 70);
+		dispatchPointer(overlay, 'pointermove', 260, 170);
+
+		expect(onrectchange).toHaveBeenLastCalledWith({
+			x: 0.8,
+			y: 0.7,
+			width: 0.2,
+			height: 0.3
+		});
 	});
 
 	it('captures pointer drags and corner resizes as normalized rectangles', () => {
@@ -107,5 +133,33 @@ describe('FieldOverlay', () => {
 		await userEvent.keyboard('{Delete}');
 		expect(ondelete).toHaveBeenCalledWith('student-id');
 		expect(field.rect).toEqual({ x: 0.69, y: 0.79, width: 0.3, height: 0.2 });
+	});
+
+	it('keeps dimensions unchanged when arrow movement exceeds right and bottom bounds', async () => {
+		const onrectchange = vi.fn();
+		render(FieldOverlay, {
+			field: textField({ x: 0.7, y: 0.8, width: 0.3, height: 0.2 }),
+			width: 200,
+			height: 100,
+			onrectchange
+		});
+		const overlay = page.getByRole('button', { name: 'Text field "student_name"' });
+
+		await overlay.click();
+		await userEvent.keyboard('{ArrowRight}');
+		expect(onrectchange).toHaveBeenLastCalledWith({
+			x: 0.7,
+			y: 0.8,
+			width: 0.3,
+			height: 0.2
+		});
+
+		await userEvent.keyboard('{ArrowDown}');
+		expect(onrectchange).toHaveBeenLastCalledWith({
+			x: 0.7,
+			y: 0.8,
+			width: 0.3,
+			height: 0.2
+		});
 	});
 });

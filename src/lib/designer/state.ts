@@ -34,6 +34,25 @@ export function constrainFieldRect(rect: FieldRect): FieldRect {
 	};
 }
 
+export function constrainMovedFieldRect(rect: FieldRect): FieldRect {
+	assertFiniteRect(rect);
+	if (
+		rect.width < MIN_FIELD_SIZE ||
+		rect.height < MIN_FIELD_SIZE ||
+		rect.width > 1 ||
+		rect.height > 1
+	) {
+		throw new RangeError('Moved field dimensions must already fit within the normalized page');
+	}
+
+	return {
+		x: clamp(rect.x, 0, 1 - rect.width),
+		y: clamp(rect.y, 0, 1 - rect.height),
+		width: rect.width,
+		height: rect.height
+	};
+}
+
 function updateField(
 	definition: FormDefinition,
 	id: string,

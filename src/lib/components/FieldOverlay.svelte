@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { normalizedToViewport, viewportToNormalized } from '../coordinates.js';
-	import { constrainFieldRect } from '../designer/state.js';
+	import { constrainFieldRect, constrainMovedFieldRect } from '../designer/state.js';
 	import type { FieldRect, FormField } from '../types.js';
 
 	interface Props {
@@ -39,6 +39,7 @@
 	let fieldLabel = $derived(
 		`${field.type === 'text' ? 'Text' : 'Signature'} field "${field.name}"`
 	);
+	let groupLabel = $derived(`Field "${field.name}" controls`);
 	let resizeLabel = $derived(`Resize field "${field.name}"`);
 
 	function beginInteraction(event: PointerEvent, mode: Interaction['mode']): void {
@@ -72,9 +73,15 @@
 				? { ...start, x: start.x + deltaX, y: start.y + deltaY }
 				: { ...start, width: start.width + deltaX, height: start.height + deltaY };
 
-		return constrainFieldRect(
-			viewportToNormalized(pixelRequest, interaction.pageWidth, interaction.pageHeight)
+		const normalizedRequest = viewportToNormalized(
+			pixelRequest,
+			interaction.pageWidth,
+			interaction.pageHeight
 		);
+
+		return interaction.mode === 'move'
+			? constrainMovedFieldRect(normalizedRequest)
+			: constrainFieldRect(normalizedRequest);
 	}
 
 	function handlePointerMove(event: PointerEvent): void {
@@ -143,29 +150,34 @@
 			request.y += vertical;
 		}
 
-		onrectchange?.(constrainFieldRect(request));
+		onrectchange?.(event.shiftKey ? constrainFieldRect(request) : constrainMovedFieldRect(request));
 	}
 </script>
 
 <div
 	class:selected
 	class="field-overlay"
-	role="button"
-	tabindex="0"
-	aria-label={fieldLabel}
-	aria-pressed={selected}
+	role="group"
+	aria-label={groupLabel}
 	style:left={`${pixelRect.x}px`}
 	style:top={`${pixelRect.y}px`}
 	style:width={`${pixelRect.width}px`}
 	style:height={`${pixelRect.height}px`}
-	onfocus={() => onselect?.(field.id)}
-	onkeydown={handleKeydown}
-	onpointerdown={handleFieldPointerDown}
-	onpointermove={handlePointerMove}
-	onpointerup={endInteraction}
-	onpointercancel={endInteraction}
 >
-	<span class="field-name">{field.name}</span>
+	<button
+		type="button"
+		class="field-target"
+		aria-label={fieldLabel}
+		aria-pressed={selected}
+		onfocus={() => onselect?.(field.id)}
+		onkeydown={handleKeydown}
+		onpointerdown={handleFieldPointerDown}
+		onpointermove={handlePointerMove}
+		onpointerup={endInteraction}
+		onpointercancel={endInteraction}
+	>
+		<span class="field-name">{field.name}</span>
+	</button>
 	<button
 		type="button"
 		class="resize-handle"
@@ -184,20 +196,30 @@
 		box-sizing: border-box;
 		min-width: 1px;
 		min-height: 1px;
+	}
+
+	.field-target {
+		position: absolute;
+		inset: 0;
+		box-sizing: border-box;
+		width: 100%;
+		height: 100%;
+		padding: 0;
 		border: 2px solid var(--bionic-sign-field-border, #2563eb);
 		background: var(--bionic-sign-field-background, rgb(37 99 235 / 12%));
 		color: var(--bionic-sign-field-text, #172554);
+		text-align: left;
 		cursor: move;
 		touch-action: none;
 		user-select: none;
 	}
 
-	.field-overlay.selected {
+	.field-overlay.selected .field-target {
 		border-color: var(--bionic-sign-field-selected, #1d4ed8);
 		background: var(--bionic-sign-field-selected-background, rgb(29 78 216 / 20%));
 	}
 
-	.field-overlay:focus-visible {
+	.field-target:focus-visible {
 		outline: 3px solid var(--bionic-sign-focus, #1d4ed8);
 		outline-offset: 2px;
 	}

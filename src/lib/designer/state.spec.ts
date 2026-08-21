@@ -3,6 +3,7 @@ import type { FormDefinition, FormField } from '../types.js';
 import {
 	MIN_FIELD_SIZE,
 	addField,
+	constrainMovedFieldRect,
 	deleteField,
 	renameField,
 	toggleRequired,
@@ -91,6 +92,17 @@ describe('designer state commands', () => {
 		expect(updated.fields[0].rect).toMatchObject({ x: 0.8, y: 0.9 });
 		expect(updated.fields[0].rect.width).toBeCloseTo(0.2);
 		expect(updated.fields[0].rect.height).toBeCloseTo(0.1);
+	});
+
+	it('clamps movement without changing field dimensions', () => {
+		const moved = constrainMovedFieldRect({
+			x: 1.4,
+			y: 1.2,
+			width: 0.3,
+			height: 0.2
+		});
+
+		expect(moved).toEqual({ x: 0.7, y: 0.8, width: 0.3, height: 0.2 });
 	});
 
 	it('toggles required state immutably', () => {
