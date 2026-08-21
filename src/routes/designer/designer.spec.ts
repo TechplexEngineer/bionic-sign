@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { FormDefinition } from '$lib/index.js';
 import LandingPage from '../+page.svelte';
+import { computedContrastRatio } from '../contrast.spec-helper.js';
 import DesignerPage from './+page.svelte';
 
 declare module 'vitest/browser' {
@@ -49,7 +50,7 @@ describe('Bionic Sign demo landing and designer', () => {
 		await page.getByRole('button', { name: 'Load PDF URL' }).click();
 		await expect
 			.element(page.getByRole('status', { name: 'PDF source status' }))
-			.toHaveTextContent('URL');
+			.toHaveTextContent('PDF loaded from URL: /demo/field-trip-permission.pdf?source=url');
 
 		const fixtureBytes = await fetch('/demo/field-trip-permission.pdf').then((response) =>
 			response.arrayBuffer()
@@ -86,5 +87,20 @@ describe('Bionic Sign demo landing and designer', () => {
 				expect.objectContaining({ name: 'parent_signature', page: 1, type: 'signature' })
 			]
 		});
+	});
+
+	it('keeps small designer panel text at WCAG AA contrast on its rendered backgrounds', async () => {
+		render(DesignerPage);
+
+		const examples = [
+			page.getByText('URL sources need browser-accessible CORS headers.'),
+			page.getByText('or', { exact: true }),
+			page.getByText('Load this file in the filler or persist it in your own application.')
+		];
+
+		for (const example of examples) {
+			await expect.element(example).toBeVisible();
+			expect(computedContrastRatio(example.element() as HTMLElement)).toBeGreaterThanOrEqual(4.5);
+		}
 	});
 });

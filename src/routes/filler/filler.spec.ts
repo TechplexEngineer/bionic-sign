@@ -2,6 +2,7 @@ import { commands, page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { FormDefinition, FormValues } from '$lib/index.js';
+import { computedContrastRatio } from '../contrast.spec-helper.js';
 import FillerPage from './+page.svelte';
 
 declare module 'vitest/browser' {
@@ -51,6 +52,54 @@ const savedDefinition: FormDefinition = {
 		}
 	]
 };
+
+const prefillOnlyDefinition: FormDefinition = {
+	version: 1,
+	fields: [
+		{
+			id: 'student-id',
+			name: 'student_name',
+			type: 'text',
+			page: 1,
+			rect: { x: 0.17, y: 0.24, width: 0.5, height: 0.07 },
+			required: true
+		}
+	]
+};
+
+async function loadPrefillOnlyDefinition(filename = 'prefill-only.schema.json'): Promise<void> {
+	await page.getByLabelText('Schema file').upload(
+		new File([JSON.stringify(prefillOnlyDefinition)], filename, {
+			type: 'application/json'
+		})
+	);
+	await expect
+		.element(page.getByRole('status', { name: 'Schema status' }))
+		.toHaveTextContent(filename);
+}
+
+async function submitPrefilledForm(): Promise<void> {
+	const download = await commands.captureDownload('Submit signed PDF');
+	expect(download.bytes.slice(0, 5)).toEqual([37, 80, 68, 70, 45]);
+	await vi.waitFor(() => {
+		const value = (
+			page.getByRole('textbox', { name: 'Submission JSON' }).element() as HTMLTextAreaElement
+		).value;
+		expect(value).toContain('Jordan Lee');
+	});
+	await expect
+		.element(page.getByRole('status', { name: 'Submission validation' }))
+		.toHaveTextContent('Signed PDF is ready to download.');
+}
+
+async function expectSubmissionReset(): Promise<void> {
+	await expect
+		.element(page.getByRole('textbox', { name: 'Submission JSON' }))
+		.toHaveValue('No completed submission yet.');
+	await expect
+		.element(page.getByRole('status', { name: 'Submission validation' }))
+		.toHaveTextContent('Complete the required fields to create a download.');
+}
 
 describe('Bionic Sign filler demo', () => {
 	it('reloads a saved schema, keeps prefills editable, validates, signs independently, and downloads', async () => {
@@ -115,7 +164,67 @@ describe('Bionic Sign filler demo', () => {
 
 		await expect.element(page.getByLabelText('PDF URL')).toBeVisible();
 		await expect.element(page.getByLabelText('PDF file')).toBeVisible();
+		await page.getByLabelText('PDF URL').fill('/demo/field-trip-permission.pdf?source=filler-url');
+		await page.getByRole('button', { name: 'Load PDF URL' }).click();
+		await expect
+			.element(page.getByRole('status', { name: 'PDF source status' }))
+			.toHaveTextContent('PDF loaded from URL: /demo/field-trip-permission.pdf?source=filler-url');
 		await expect.element(page.getByText(/never leaves this browser/i)).toBeVisible();
 		await expect.element(page.getByText(/not certificate-backed/i)).toBeVisible();
+	});
+
+	it('clears completed output after URL and local-file PDF replacements', async () => {
+		render(FillerPage);
+		await loadPrefillOnlyDefinition();
+		await submitPrefilledForm();
+
+		await page.getByLabelText('PDF URL').fill('/demo/field-trip-permission.pdf?source=reset');
+		await page.getByRole('button', { name: 'Load PDF URL' }).click();
+		await expect
+			.element(page.getByRole('status', { name: 'PDF source status' }))
+			.toHaveTextContent('PDF loaded from URL: /demo/field-trip-permission.pdf?source=reset');
+		await expectSubmissionReset();
+
+		await submitPrefilledForm();
+		const fixtureBytes = await fetch('/demo/field-trip-permission.pdf').then((response) =>
+			response.arrayBuffer()
+		);
+		await page
+			.getByLabelText('PDF file')
+			.upload(new File([fixtureBytes], 'replacement.pdf', { type: 'application/pdf' }));
+		await expect
+			.element(page.getByRole('status', { name: 'PDF source status' }))
+			.toHaveTextContent('Local PDF ready: replacement.pdf');
+		await expectSubmissionReset();
+	});
+
+	it('clears completed output after schema and host-prefill changes', async () => {
+		render(FillerPage);
+		await loadPrefillOnlyDefinition();
+		await submitPrefilledForm();
+
+		await loadPrefillOnlyDefinition('replacement.schema.json');
+		await expectSubmissionReset();
+		await submitPrefilledForm();
+
+		await page.getByLabelText('Student name prefill').fill('Casey Patel');
+		await expectSubmissionReset();
+	});
+
+	it('keeps filler helper and status text at WCAG AA contrast on rendered backgrounds', async () => {
+		render(FillerPage);
+
+		const examples = [
+			page.getByText('Use the demo assets or replace either side with a local file.'),
+			page.getByRole('status', { name: 'PDF source status' }),
+			page.getByText('Version 1 JSON · named text and signature fields'),
+			page.getByText('The flattened PDF downloads after the same successful submit.'),
+			page.getByText('This demo has no backend, upload endpoint, account, or database.')
+		];
+
+		for (const example of examples) {
+			await expect.element(example).toBeVisible();
+			expect(computedContrastRatio(example.element() as HTMLElement)).toBeGreaterThanOrEqual(4.5);
+		}
 	});
 });

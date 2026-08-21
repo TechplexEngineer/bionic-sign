@@ -26,6 +26,7 @@ export default defineConfig({
 				extends: './vite.config.ts',
 				test: {
 					name: 'client',
+					sequence: { groupOrder: 1 },
 					browser: {
 						enabled: true,
 						provider: playwright(),
@@ -58,6 +59,7 @@ export default defineConfig({
 				extends: './vite.config.ts',
 				test: {
 					name: 'server',
+					sequence: { groupOrder: 0 },
 					environment: 'node',
 					include: ['src/**/*.{test,spec}.{js,ts}'],
 					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/routes/**/*.spec.ts']

@@ -14,6 +14,8 @@
 
 	const demoPdfUrl = '/demo/field-trip-permission.pdf';
 	const demoSchemaUrl = '/demo/field-trip-permission.schema.json';
+	const emptyValidationSummary = 'Complete the required fields to create a download.';
+	const emptySubmissionJson = 'No completed submission yet.';
 	const downloadUrls: string[] = [];
 
 	let source = $state<PdfSource>(demoPdfUrl);
@@ -22,8 +24,8 @@
 	let definition = $state<FormDefinition>();
 	let schemaStatus = $state('Loading the demo schema…');
 	let studentPrefill = $state('Jordan Lee');
-	let validationSummary = $state('Complete the required fields to create a download.');
-	let submissionJson = $state('No completed submission yet.');
+	let validationSummary = $state(emptyValidationSummary);
+	let submissionJson = $state(emptySubmissionJson);
 	let errorMessage = $state('');
 	let diagnostics = $state<BionicSignDiagnostic[]>([]);
 	let sourceRevision = 0;
@@ -31,6 +33,12 @@
 
 	function messageFor(reason: unknown): string {
 		return reason instanceof Error ? reason.message : 'An unknown browser error occurred.';
+	}
+
+	function resetSubmissionOutput(): void {
+		validationSummary = emptyValidationSummary;
+		submissionJson = emptySubmissionJson;
+		diagnostics = [];
 	}
 
 	function loadUrl(): void {
@@ -41,6 +49,7 @@
 		}
 
 		sourceRevision += 1;
+		resetSubmissionOutput();
 		source = nextUrl;
 		sourceStatus = `PDF loaded from URL: ${nextUrl}`;
 		errorMessage = '';
@@ -61,6 +70,7 @@
 		try {
 			const bytes = new Uint8Array(await file.arrayBuffer());
 			if (revision !== sourceRevision) return;
+			resetSubmissionOutput();
 			source = bytes;
 			sourceStatus = `Local PDF ready: ${file.name}`;
 		} catch (reason) {
@@ -81,11 +91,9 @@
 			const parsed = JSON.parse(await file.text()) as unknown;
 			const nextDefinition = validateDefinition(parsed);
 			if (revision !== schemaRevision) return;
+			resetSubmissionOutput();
 			definition = cloneDefinition(nextDefinition);
 			schemaStatus = `Schema ready: ${file.name}`;
-			validationSummary = 'Complete the required fields to create a download.';
-			submissionJson = 'No completed submission yet.';
-			diagnostics = [];
 		} catch (reason) {
 			if (revision !== schemaRevision) return;
 			errorMessage = `Could not load ${file.name}: ${messageFor(reason)}`;
@@ -136,6 +144,13 @@
 		errorMessage = messageFor(reason);
 	}
 
+	function updateStudentPrefill(event: Event): void {
+		const nextPrefill = (event.currentTarget as HTMLInputElement).value;
+		if (nextPrefill === studentPrefill) return;
+		studentPrefill = nextPrefill;
+		resetSubmissionOutput();
+	}
+
 	$effect(() => {
 		const controller = new AbortController();
 		const revision = ++schemaRevision;
@@ -146,6 +161,7 @@
 				if (!response.ok) throw new Error(`Demo schema request failed (${response.status})`);
 				const nextDefinition = validateDefinition(await response.json());
 				if (revision !== schemaRevision || controller.signal.aborted) return;
+				resetSubmissionOutput();
 				definition = cloneDefinition(nextDefinition);
 				schemaStatus = 'Demo schema ready: field-trip-permission.schema.json';
 			} catch (reason) {
@@ -215,7 +231,13 @@
 					>
 						<label for="pdf-url">PDF URL</label>
 						<div class="input-action">
-							<input id="pdf-url" type="url" bind:value={sourceUrl} spellcheck="false" />
+							<input
+								id="pdf-url"
+								type="text"
+								inputmode="url"
+								bind:value={sourceUrl}
+								spellcheck="false"
+							/>
 							<button type="submit">Load PDF URL</button>
 						</div>
 					</form>
@@ -239,7 +261,7 @@
 				<div class="control-group prefill-control">
 					<p class="control-label">Host prefill</p>
 					<label for="student-prefill">Student name prefill</label>
-					<input id="student-prefill" bind:value={studentPrefill} />
+					<input id="student-prefill" value={studentPrefill} oninput={updateStudentPrefill} />
 					<p>The signer can still edit this value in the PDF.</p>
 				</div>
 			</div>
@@ -506,7 +528,7 @@
 
 	.panel-heading p {
 		margin-top: 0.25rem;
-		color: #707a73;
+		color: #5f6b64;
 		font-size: 0.78rem;
 	}
 
@@ -583,7 +605,7 @@
 	.control-group > p:last-child,
 	.schema-hint {
 		margin: 0;
-		color: #708076;
+		color: #5f6b64;
 		font-size: 0.68rem;
 		line-height: 1.45;
 	}
@@ -689,7 +711,7 @@
 
 	.microcopy {
 		margin: 0;
-		color: #727c75;
+		color: #5f6b64;
 		font-size: 0.68rem;
 		line-height: 1.5;
 	}
@@ -727,7 +749,7 @@
 
 	.trust-grid p {
 		margin: 0.35rem 0 0;
-		color: #707a73;
+		color: #5f6b64;
 		font-size: 0.72rem;
 		line-height: 1.5;
 	}

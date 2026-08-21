@@ -145,7 +145,13 @@
 				>
 					<label for="pdf-url">PDF URL</label>
 					<div class="input-action">
-						<input id="pdf-url" type="url" bind:value={sourceUrl} spellcheck="false" />
+						<input
+							id="pdf-url"
+							type="text"
+							inputmode="url"
+							bind:value={sourceUrl}
+							spellcheck="false"
+						/>
 						<button type="submit">Load PDF URL</button>
 					</div>
 				</form>
@@ -381,7 +387,7 @@
 
 	.panel-heading p {
 		margin-top: 0.25rem;
-		color: #707a73;
+		color: #5f6b64;
 		font-size: 0.78rem;
 	}
 
@@ -439,7 +445,7 @@
 		display: grid;
 		height: 2.75rem;
 		place-items: center;
-		color: #8a928d;
+		color: #5f6b64;
 		font-family: Georgia, serif;
 		font-size: 0.8rem;
 		font-style: italic;
@@ -532,7 +538,7 @@
 
 	.microcopy {
 		margin: 0.75rem 0 0;
-		color: #727c75;
+		color: #5f6b64;
 		font-size: 0.68rem;
 		line-height: 1.5;
 	}
