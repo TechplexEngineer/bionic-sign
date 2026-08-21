@@ -9,3 +9,6 @@ bun.lockb
 /static/
 .superpowers/
 docs/superpowers/
+
+# Cloudflare
+worker-configuration.d.ts
