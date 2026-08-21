@@ -7,6 +7,7 @@ import {
 	deleteField,
 	renameField,
 	toggleRequired,
+	updateDropdownOptions,
 	updateFieldRect
 } from './state.js';
 
@@ -40,6 +41,26 @@ describe('designer state commands', () => {
 		expect(second.fields[2].name).toBe('text_3');
 		expect(second.fields[2].id).not.toBe(first.fields[1].id);
 		expect(original).toEqual(definition(field('existing', 'text_1')));
+	});
+
+	it('adds dropdown fields with a configurable default option', () => {
+		const added = addField(definition(), 'dropdown', 1);
+
+		expect(added.fields[0]).toEqual(
+			expect.objectContaining({
+				name: 'dropdown_1',
+				type: 'dropdown',
+				options: ['Option 1']
+			})
+		);
+	});
+
+	it('updates dropdown options without mutating the input definition', () => {
+		const original = addField(definition(), 'dropdown', 1);
+		const updated = updateDropdownOptions(original, original.fields[0].id, ['Yes', 'No']);
+
+		expect(updated.fields[0]).toEqual(expect.objectContaining({ options: ['Yes', 'No'] }));
+		expect(original.fields[0]).toEqual(expect.objectContaining({ options: ['Option 1'] }));
 	});
 
 	it('renames a field without changing the input definition', () => {

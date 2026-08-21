@@ -5,6 +5,7 @@
 		deleteField,
 		renameField,
 		toggleRequired,
+		updateDropdownOptions,
 		updateFieldRect
 	} from '../designer/state.js';
 	import { cloneDefinition, validateDefinition } from '../schema.js';
@@ -50,13 +51,19 @@
 	let fieldsPanelOpen = $state(false);
 	let propertiesPanelOpen = $state(false);
 	let fieldNameError = $state<string>();
+	let optionsError = $state<string>();
 	let selectedField = $derived(localDefinition.fields.find(({ id }) => id === selectedFieldId));
 	let nameDraft = $derived(selectedField?.name ?? '');
+	let optionsDraft = $derived(
+		selectedField?.type === 'dropdown' ? selectedField.options.join('\n') : ''
+	);
 
 	$effect(() => {
 		const storedName = selectedField?.name ?? '';
 		nameDraft = storedName;
 		fieldNameError = undefined;
+		optionsDraft = selectedField?.type === 'dropdown' ? selectedField.options.join('\n') : '';
+		optionsError = undefined;
 	});
 
 	function issueFor(reason: unknown, fieldName?: string): ValidationIssue {
@@ -68,8 +75,11 @@
 	}
 
 	export function validate(): ValidationResult {
-		if (fieldNameError) {
-			return { valid: false, issues: [issueFor(new Error(fieldNameError), nameDraft)] };
+		if (fieldNameError || optionsError) {
+			return {
+				valid: false,
+				issues: [issueFor(new Error(fieldNameError ?? optionsError), nameDraft)]
+			};
 		}
 
 		try {
@@ -142,6 +152,18 @@
 	function editRequired(): void {
 		if (!selectedField) return;
 		commitDefinition(toggleRequired(localDefinition, selectedField.id));
+	}
+
+	function editOptions(event: Event): void {
+		if (selectedField?.type !== 'dropdown') return;
+		optionsDraft = (event.currentTarget as HTMLTextAreaElement).value;
+		const options = optionsDraft.split('\n').map((option) => option.trim());
+		try {
+			commitDefinition(updateDropdownOptions(localDefinition, selectedField.id, options));
+			optionsError = undefined;
+		} catch (reason) {
+			optionsError = reason instanceof Error ? reason.message : 'The dropdown options are invalid';
+		}
 	}
 
 	function changeRect(id: string, rect: FieldRect): void {
@@ -220,6 +242,7 @@
 			</div>
 			<div class="field-actions">
 				<button type="button" onclick={() => add('text')}>Add text field</button>
+				<button type="button" onclick={() => add('dropdown')}>Add dropdown field</button>
 				<button type="button" onclick={() => add('signature')}>Add signature field</button>
 			</div>
 			<nav aria-label="PDF pages">
@@ -272,6 +295,16 @@
 					</label>
 					{#if fieldNameError}
 						<p class="field-error" role="alert">{fieldNameError}</p>
+					{/if}
+					{#if selectedField.type === 'dropdown'}
+						<label>
+							Options
+							<textarea rows="5" value={optionsDraft} oninput={editOptions}></textarea>
+						</label>
+						<p class="options-hint">One option per line.</p>
+						{#if optionsError}
+							<p class="field-error" role="alert">{optionsError}</p>
+						{/if}
 					{/if}
 					<label class="checkbox-label">
 						<input type="checkbox" checked={selectedField.required} onchange={editRequired} />
@@ -421,7 +454,8 @@
 	}
 
 	button,
-	input {
+	input,
+	textarea {
 		font: inherit;
 	}
 
@@ -440,7 +474,8 @@
 	}
 
 	button:focus-visible,
-	input:focus-visible {
+	input:focus-visible,
+	textarea:focus-visible {
 		outline: 3px solid var(--bionic-sign-focus, #2563eb);
 		outline-offset: 2px;
 	}
@@ -490,13 +525,20 @@
 		gap: 0.5rem;
 	}
 
-	input:not([type='checkbox']) {
+	input:not([type='checkbox']),
+	textarea {
 		box-sizing: border-box;
 		width: 100%;
 		min-width: 0;
 		padding: 0.45rem 0.55rem;
 		border: 1px solid var(--designer-border);
 		border-radius: 0.35rem;
+	}
+
+	.options-hint {
+		margin: -0.5rem 0 0;
+		color: var(--bionic-sign-muted-text, #475569);
+		font-size: 0.8rem;
 	}
 
 	.field-error {

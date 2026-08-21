@@ -9,8 +9,9 @@ function field(id: string, name: string, type: FormField['type'] = 'text'): Form
 		type,
 		page: 1,
 		rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
-		required: true
-	};
+		required: true,
+		...(type === 'dropdown' ? { options: ['Option 1'] } : {})
+	} as FormField;
 }
 
 function definitionWithTextAndSignature(): FormDefinition {
@@ -93,6 +94,56 @@ describe('validateDefinition', () => {
 			version: 1,
 			fields: [input]
 		});
+	});
+
+	it('accepts dropdown fields with independent cloned options', () => {
+		const input = {
+			version: 1,
+			fields: [
+				{
+					id: 'grade-id',
+					name: 'grade',
+					type: 'dropdown',
+					page: 1,
+					rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+					required: true,
+					options: [' Freshman ', 'Sophomore']
+				}
+			]
+		};
+
+		const parsed = validateDefinition(input);
+		input.fields[0].options[0] = 'mutated';
+
+		expect(parsed.fields[0]).toEqual(
+			expect.objectContaining({
+				type: 'dropdown',
+				options: ['Freshman', 'Sophomore']
+			})
+		);
+	});
+
+	it.each([
+		[[], /option/i],
+		[[''], /empty/i],
+		[['Freshman', 'Freshman'], /unique/i]
+	] as const)('rejects invalid dropdown options %j', (options, message) => {
+		expect(() =>
+			validateDefinition({
+				version: 1,
+				fields: [
+					{
+						id: 'grade-id',
+						name: 'grade',
+						type: 'dropdown',
+						page: 1,
+						rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+						required: true,
+						options
+					}
+				]
+			})
+		).toThrow(message);
 	});
 });
 

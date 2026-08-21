@@ -32,7 +32,12 @@ export interface SignatureField extends BaseField {
 	type: 'signature';
 }
 
-export type FormField = TextField | SignatureField;
+export interface DropdownField extends BaseField {
+	type: 'dropdown';
+	options: string[];
+}
+
+export type FormField = TextField | SignatureField | DropdownField;
 
 export interface FormDefinition {
 	version: 1;

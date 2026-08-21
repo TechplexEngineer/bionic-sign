@@ -28,8 +28,9 @@ function cloneValue(value: FormValues[string]): FormValues[string] {
 }
 
 export function cloneValues(values: FormValues): FormValues {
-	return Object.fromEntries(
-		Object.entries(values).map(([name, value]) => [name, cloneValue(value)])
+	return Object.assign(
+		Object.create(null) as FormValues,
+		Object.fromEntries(Object.entries(values).map(([name, value]) => [name, cloneValue(value)]))
 	);
 }
 
@@ -70,10 +71,12 @@ export function clearFieldValue(values: FormValues, fieldName: string): FormValu
 
 export function isFieldComplete(field: FormField, values: FormValues): boolean {
 	const value = values[field.name];
-	if (!value || value.type !== field.type) return false;
-	return field.type === 'text'
-		? value.type === 'text' && value.value.trim().length > 0
-		: value.type === 'signature' && value.image.length > 0;
+	if (!value) return false;
+	if (field.type === 'signature') {
+		return value.type === 'signature' && value.image.length > 0;
+	}
+	if (value.type !== 'text' || value.value.trim().length === 0) return false;
+	return field.type === 'text' || field.options.includes(value.value);
 }
 
 export function requiredProgress(definition: FormDefinition, values: FormValues): RequiredProgress {

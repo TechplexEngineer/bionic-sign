@@ -212,7 +212,11 @@
 	}
 
 	function editText(fieldName: string, event: Event): void {
-		values = setTextValue(values, fieldName, (event.currentTarget as HTMLInputElement).value);
+		values = setTextValue(
+			values,
+			fieldName,
+			(event.currentTarget as HTMLInputElement | HTMLSelectElement).value
+		);
 		lastValidation = undefined;
 	}
 
@@ -339,6 +343,20 @@
 					onfocus={() => (selectedFieldId = field.id)}
 					oninput={(event) => editText(field.name, event)}
 				/>
+			{:else if field.type === 'dropdown'}
+				<select
+					data-filler-field-id={field.id}
+					aria-label={field.name}
+					aria-invalid={fieldIsInvalid(field.name) ? 'true' : undefined}
+					value={textValue(field.name)}
+					onfocus={() => (selectedFieldId = field.id)}
+					onchange={(event) => editText(field.name, event)}
+				>
+					<option value="">Select an option</option>
+					{#each field.options as option (option)}
+						<option value={option}>{option}</option>
+					{/each}
+				</select>
 			{:else}
 				<button
 					type="button"
@@ -503,6 +521,7 @@
 	}
 
 	.filler-field input,
+	.filler-field select,
 	.filler-field button {
 		width: 100%;
 		height: 100%;
@@ -514,6 +533,7 @@
 	}
 
 	.filler-field input:focus-visible,
+	.filler-field select:focus-visible,
 	.filler-field button:focus-visible,
 	button:focus-visible {
 		outline: 3px solid var(--bionic-sign-focus, #1d4ed8);
