@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import adapter from '@sveltejs/adapter-auto';
@@ -28,9 +29,27 @@ export default defineConfig({
 					browser: {
 						enabled: true,
 						provider: playwright(),
-						instances: [{ browser: 'chromium', headless: true }]
+						instances: [{ browser: 'chromium', headless: true }],
+						commands: {
+							captureDownload: async ({ page, frame }, accessibleName: string) => {
+								const testFrame = await frame();
+								const [download] = await Promise.all([
+									page.waitForEvent('download'),
+									testFrame.getByRole('button', { name: accessibleName, exact: true }).click()
+								]);
+								const path = await download.path();
+								if (!path) throw new Error('The browser download did not produce a local file');
+								const bytes = await readFile(path);
+
+								return {
+									filename: download.suggestedFilename(),
+									bytes: Array.from(bytes),
+									text: bytes.toString('utf8')
+								};
+							}
+						}
 					},
-					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+					include: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/routes/**/*.spec.ts'],
 					exclude: ['src/lib/server/**']
 				}
 			},
@@ -41,7 +60,7 @@ export default defineConfig({
 					name: 'server',
 					environment: 'node',
 					include: ['src/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}', 'src/routes/**/*.spec.ts']
 				}
 			}
 		]

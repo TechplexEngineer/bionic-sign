@@ -1,0 +1,44 @@
+{
+	"version": 1,
+	"fields": [
+		{
+			"id": "student-name",
+			"name": "student_name",
+			"type": "text",
+			"page": 1,
+			"rect": {
+				"x": 0.12,
+				"y": 0.22,
+				"width": 0.5,
+				"height": 0.07
+			},
+			"required": true
+		},
+		{
+			"id": "parent-name",
+			"name": "parent_name",
+			"type": "text",
+			"page": 2,
+			"rect": {
+				"x": 0.12,
+				"y": 0.28,
+				"width": 0.5,
+				"height": 0.07
+			},
+			"required": true
+		},
+		{
+			"id": "parent-signature",
+			"name": "parent_signature",
+			"type": "signature",
+			"page": 2,
+			"rect": {
+				"x": 0.12,
+				"y": 0.46,
+				"width": 0.5,
+				"height": 0.12
+			},
+			"required": true
+		}
+	]
+}
