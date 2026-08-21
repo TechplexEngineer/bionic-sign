@@ -17,7 +17,9 @@
 	"files": [
 		"dist",
 		"!dist/**/*.test.*",
-		"!dist/**/*.spec.*"
+		"!dist/**/*.spec.*",
+		"!dist/**/fixtures/**",
+		"!dist/vitest-examples/**"
 	],
 	"sideEffects": [
 		"**/*.css"

@@ -98,7 +98,7 @@ function definition(): FormDefinition {
 	};
 }
 
-function usePdf(): void {
+function usePdf(): { document: PDFDocumentProxy; getDocument: ReturnType<typeof vi.fn> } {
 	const pages = [1, 2].map((number) => {
 		const page = {
 			getViewport: vi.fn(() => ({ width: 600, height: 800 })),
@@ -112,9 +112,23 @@ function usePdf(): void {
 		getPage: vi.fn((pageNumber: number) => Promise.resolve(pages[pageNumber - 1].page)),
 		numPages: pages.length
 	} as unknown as PDFDocumentProxy;
-	pdfMocks.getPdfJs.mockResolvedValue({
-		getDocument: vi.fn(() => ({ destroy: vi.fn(), promise: Promise.resolve(document) }))
-	});
+	const getDocument = vi.fn(() => ({ destroy: vi.fn(), promise: Promise.resolve(document) }));
+	pdfMocks.getPdfJs.mockResolvedValue({ getDocument });
+	return { document, getDocument };
+}
+
+function emptyDefinition(): FormDefinition {
+	return { version: 1, fields: [] };
+}
+
+function invalidDefinition(kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'): FormDefinition {
+	const invalid = definition();
+	if (kind === 'duplicate-id') invalid.fields[1].id = invalid.fields[0].id;
+	if (kind === 'duplicate-name') invalid.fields[1].name = invalid.fields[0].name;
+	if (kind === 'malformed-rect') {
+		invalid.fields[0].rect = { x: 0.9, y: 0.2, width: 0.3, height: 0.1 };
+	}
+	return invalid;
 }
 
 beforeEach(() => {
@@ -133,6 +147,119 @@ afterEach(() => {
 });
 
 describe('PdfFormFiller', () => {
+	it('exports the same immutable URL-byte snapshot that PDF.js displayed', async () => {
+		const displayed = new Uint8Array([10, 20, 30]);
+		const changedResponse = new Uint8Array([90, 91, 92]);
+		let urlLoads = 0;
+		pdfMocks.loadPdfBytes.mockImplementation(async (input: string | Uint8Array | ArrayBuffer) => {
+			if (typeof input === 'string') {
+				urlLoads += 1;
+				return (urlLoads === 1 ? displayed : changedResponse).slice();
+			}
+			return input instanceof Uint8Array
+				? input.slice()
+				: new Uint8Array(input).slice();
+		});
+		const { getDocument } = usePdf();
+		const result = render(PdfFormFiller, {
+			source: 'https://example.test/changing.pdf',
+			definition: emptyDefinition()
+		});
+
+		await expect.element(page.getByLabelText('PDF page 1')).toBeVisible();
+		await result.component.exportPdf();
+
+		expect(urlLoads).toBe(1);
+		expect(getDocument.mock.calls[0][0].data).toEqual(displayed);
+		expect(pdfMocks.exportFlattenedPdf.mock.calls[0][0]).toEqual(displayed);
+		expect(pdfMocks.exportFlattenedPdf.mock.calls[0][0]).not.toBe(displayed);
+	});
+
+	it('gates UI and imperative export until the generation-matched source is ready', async () => {
+		const sourceLoad = deferred<Uint8Array>();
+		let urlLoads = 0;
+		pdfMocks.loadPdfBytes.mockImplementation((input: string | Uint8Array | ArrayBuffer) => {
+			if (typeof input === 'string') {
+				urlLoads += 1;
+				return urlLoads === 1 ? sourceLoad.promise : Promise.resolve(new Uint8Array([9]));
+			}
+			return Promise.resolve(
+				input instanceof Uint8Array ? input.slice() : new Uint8Array(input).slice()
+			);
+		});
+		const result = render(PdfFormFiller, {
+			source: 'https://example.test/pending.pdf',
+			definition: emptyDefinition()
+		});
+
+		await expect.element(page.getByRole('button', { name: 'Submit signed PDF' })).toBeDisabled();
+		await expect(result.component.exportPdf()).rejects.toMatchObject({ code: 'pdf-not-ready' });
+		expect(pdfMocks.exportFlattenedPdf).not.toHaveBeenCalled();
+
+		sourceLoad.resolve(new Uint8Array([1, 2, 3]));
+		await expect.element(page.getByLabelText('PDF page 1')).toBeVisible();
+		await expect.element(page.getByRole('button', { name: 'Submit signed PDF' })).toBeEnabled();
+	});
+
+	it.each(['duplicate-id', 'duplicate-name', 'malformed-rect'] as const)(
+		'reports and recovers from a %s definition at the prop boundary',
+		async (kind) => {
+			usePdf();
+			const onerror = vi.fn();
+			const source = new Uint8Array([1]);
+			const result = render(PdfFormFiller, {
+				source,
+				definition: invalidDefinition(kind),
+				onerror
+			});
+
+			await expect.element(page.getByRole('alert')).toBeVisible();
+			expect(onerror).toHaveBeenCalledWith(
+				expect.objectContaining({ code: 'invalid-form-definition' })
+			);
+			await expect.element(page.getByRole('button', { name: 'Submit signed PDF' })).toBeDisabled();
+
+			await result.rerender({ source, definition: definition(), onerror });
+			await expect.element(page.getByRole('textbox', { name: 'student_name' })).toBeVisible();
+			await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		}
+	);
+
+	it('rejects and recovers from fields beyond the loaded document page count', async () => {
+		usePdf();
+		const onerror = vi.fn();
+		const source = new Uint8Array([1]);
+		const result = render(PdfFormFiller, {
+			source,
+			definition: definition(),
+			onerror
+		});
+
+		const onePagePdf = (() => {
+			const pageProxy = {
+				getViewport: vi.fn(() => ({ width: 600, height: 800 })),
+				render: vi.fn(
+					() => ({ promise: Promise.resolve(), cancel: vi.fn() }) as unknown as RenderTask
+				)
+			} as unknown as PDFPageProxy;
+			return {
+				getPage: vi.fn(() => Promise.resolve(pageProxy)),
+				numPages: 1
+			} as unknown as PDFDocumentProxy;
+		})();
+		pdfMocks.getPdfJs.mockResolvedValue({
+			getDocument: vi.fn(() => ({ destroy: vi.fn(), promise: Promise.resolve(onePagePdf) }))
+		});
+		await result.rerender({ source: new Uint8Array([2]), definition: definition(), onerror });
+
+		await vi.waitFor(() =>
+			expect(onerror).toHaveBeenCalledWith(
+				expect.objectContaining({ code: 'definition-page-out-of-range' })
+			)
+		);
+		await expect.element(page.getByRole('button', { name: 'Submit signed PDF' })).toBeDisabled();
+	});
+
 	it('applies the required theme token to the visible required indicator', async () => {
 		document.body.classList.add('bionic-sign');
 		document.body.style.setProperty('--bionic-sign-required', 'rgb(145 23 90)');

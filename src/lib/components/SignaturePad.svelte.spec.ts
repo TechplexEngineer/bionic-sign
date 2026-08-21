@@ -176,6 +176,16 @@ describe('SignaturePad', () => {
 		await expect.element(page.getByRole('button', { name: 'Clear signature' })).toBeVisible();
 	});
 
+	it('caps a high device-pixel ratio for the signature backing canvas', async () => {
+		Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 8 });
+
+		const result = await renderReady();
+		const canvas = result.container.querySelector('canvas');
+
+		expect(canvas?.width).toBeLessThanOrEqual(640);
+		expect(canvas?.height).toBeLessThanOrEqual(360);
+	});
+
 	it('loads an existing signature value without emitting a user change', async () => {
 		const value: SignatureValue = {
 			type: 'signature',

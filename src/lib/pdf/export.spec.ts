@@ -10,7 +10,7 @@ import {
 	PDFName,
 	PDFRawStream
 } from 'pdf-lib';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { FormDefinition, FormValues } from '../types.js';
 import { BionicSignError } from '../types.js';
@@ -20,6 +20,8 @@ const TWO_BY_ONE_PNG =
 	'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAFElEQVR42mP8z8Dwn4GBgYGJAQoAHgAD/VoS8AAAAABJRU5ErkJggg==';
 const ONE_BY_ONE_PNG =
 	'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2+XkAAAAASUVORK5CYII=';
+const NON_CANONICAL_ONE_BY_ONE_PNG =
+	'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2+XkAAAAASUVORK5CYIJ=';
 
 let fixture: Uint8Array;
 
@@ -87,6 +89,15 @@ async function sourceWithRotation(rotation: 0 | 90 | 180 | 270): Promise<Uint8Ar
 	return document.save();
 }
 
+async function sourceWithVisibleBox(rotation: 0 | 90 | 180 | 270): Promise<Uint8Array> {
+	const document = await PDFDocument.create();
+	const page = document.addPage([600, 800]);
+	page.setMediaBox(20, 30, 600, 800);
+	page.setCropBox(0, 130, 320, 400);
+	page.setRotation(degrees(rotation));
+	return document.save();
+}
+
 function imageResourceCount(document: PDFDocument, pageIndex: number): number {
 	const resources = document.getPage(pageIndex).node.Resources();
 	const xObjects = resources?.lookupMaybe(PDFName.of('XObject'), PDFDict);
@@ -110,6 +121,10 @@ async function extractedText(bytes: Uint8Array): Promise<string[][]> {
 }
 
 describe('exportFlattenedPdf', () => {
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
 	it('returns a new parseable PDF with text on its defined page without mutating inputs', async () => {
 		const source = fixture.slice();
 		const originalSource = source.slice();
@@ -224,6 +239,41 @@ describe('exportFlattenedPdf', () => {
 		expect(imageMatrices(contentForPage(document, 0))).toHaveLength(2);
 	});
 
+	it('reuses one embedded image for data URLs that decode to identical PNG bytes', async () => {
+		const form = definition([
+			{
+				id: 'first-id',
+				name: 'first',
+				type: 'signature',
+				page: 1,
+				rect: { x: 0.1, y: 0.2, width: 0.2, height: 0.1 },
+				required: true
+			},
+			{
+				id: 'second-id',
+				name: 'second',
+				type: 'signature',
+				page: 1,
+				rect: { x: 0.5, y: 0.5, width: 0.2, height: 0.1 },
+				required: true
+			}
+		]);
+
+		const output = await exportFlattenedPdf(fixture, form, {
+			first: { type: 'signature', image: ONE_BY_ONE_PNG },
+			second: { type: 'signature', image: NON_CANONICAL_ONE_BY_ONE_PNG }
+		});
+		const document = await PDFDocument.load(output);
+		const imageReferences = document
+			.getPage(0)
+			.node.normalizedEntries()
+			.XObject.values()
+			.map((reference) => reference.toString());
+
+		expect(new Set(imageReferences).size).toBe(1);
+		expect(imageMatrices(contentForPage(document, 0))).toHaveLength(2);
+	});
+
 	it('omits empty optional text and signature values', async () => {
 		const form = definition([
 			{
@@ -301,6 +351,55 @@ describe('exportFlattenedPdf', () => {
 		expect(error).toMatchObject({ code: 'export-value-type' });
 	});
 
+	it('maps a runtime null value to the typed value-mismatch error', async () => {
+		const form = definition([
+			{
+				id: 'name-id',
+				name: 'name',
+				type: 'text',
+				page: 1,
+				rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+				required: false
+			}
+		]);
+		const runtimeValues = { name: null } as unknown as FormValues;
+
+		const error = await exportFlattenedPdf(fixture, form, runtimeValues).catch(
+			(reason: unknown) => reason
+		);
+
+		expect(error).toBeInstanceOf(BionicSignError);
+		expect(error).toMatchObject({ code: 'export-value-type' });
+	});
+
+	it.each([true, false])(
+		'treats an inherited prototype value as missing for a %s prototype-named field',
+		async (required) => {
+			const form = definition([
+				{
+					id: 'prototype-id',
+					name: 'toString',
+					type: 'text',
+					page: 1,
+					rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+					required
+				}
+			]);
+
+			const result = await exportFlattenedPdf(fixture, form, {}).catch(
+				(reason: unknown) => reason
+			);
+
+			if (required) {
+				expect(result).toBeInstanceOf(BionicSignError);
+				expect(result).toMatchObject({ code: 'export-required-value' });
+			} else {
+				expect(result).toBeInstanceOf(Uint8Array);
+				expect(await PDFDocument.load(result as Uint8Array)).toBeDefined();
+			}
+		}
+	);
+
 	it.each([0, 1.5, 3])('rejects a field page outside the source PDF: %s', async (fieldPage) => {
 		const form = definition([
 			{
@@ -370,6 +469,69 @@ describe('exportFlattenedPdf', () => {
 
 			expect(matrices).toHaveLength(1);
 			expect(matrices[0]).toEqual(expectedMatrix.map((value) => expect.closeTo(value, 5)));
+		}
+	);
+
+	it.each([
+		[0, [1, 0, 0, 1, 50, 406.934], [1, 0, 0, 1, 50, 380], [1, 0, 0, 1, 0, 0]],
+		[90, [0, 1, -1, 0, 113.066, 170], [1, 0, 0, 1, 140, 190], [0, 1, -1, 0, 0, 0]],
+		[
+			180,
+			[-1, 0, 0, -1, 290, 253.066],
+			[1, 0, 0, 1, 290, 280],
+			[-1, 0, 0, -1, 0, 0]
+		],
+		[
+			270,
+			[0, -1, 1, 0, 226.934, 490],
+			[1, 0, 0, 1, 200, 470],
+			[0, -1, 1, 0, 0, 0]
+		]
+	] as const)(
+		'places text and signatures against the PDF.js-visible crop box on a %i-degree page',
+		async (rotation, expectedText, expectedImageTranslation, expectedImageRotation) => {
+			const source = await sourceWithVisibleBox(rotation);
+			const rect = { x: 0.1, y: 0.2, width: 0.4, height: 0.2 };
+			const form = definition([
+				{
+					id: 'cropped-text-id',
+					name: 'cropped_text',
+					type: 'text',
+					page: 1,
+					rect,
+					required: true
+				},
+				{
+					id: 'cropped-signature-id',
+					name: 'cropped_signature',
+					type: 'signature',
+					page: 1,
+					rect,
+					required: true
+				}
+			]);
+
+			const output = await exportFlattenedPdf(source, form, {
+				cropped_text: { type: 'text', value: 'Crop' },
+				cropped_signature: { type: 'signature', image: TWO_BY_ONE_PNG }
+			});
+			const document = await PDFDocument.load(output);
+			const content = contentForPage(document, 0);
+			const text = textMatrices(content);
+			const image = imageTransformBlocks(content);
+
+			expect(text).toHaveLength(1);
+			expect(text[0]).toEqual(expectedText.map((value) => expect.closeTo(value, 5)));
+			expect(image).toHaveLength(1);
+			expect(image[0][0]).toEqual(
+				expectedImageTranslation.map((value) => expect.closeTo(value, 5))
+			);
+			expect(image[0][1]).toEqual(
+				expectedImageRotation.map((value) => expect.closeTo(value, 5))
+			);
+			expect(image[0][2]).toEqual(
+				[120, 0, 0, 60, 0, 0].map((value) => expect.closeTo(value, 5))
+			);
 		}
 	);
 
@@ -517,5 +679,40 @@ describe('exportFlattenedPdf', () => {
 		controller.abort(reason);
 
 		await expect(promise).rejects.toBe(reason);
+	});
+
+	it('maps a generic pdf-lib load failure to a stable typed error', async () => {
+		const error = await exportFlattenedPdf(
+			new Uint8Array([1, 2, 3]),
+			definition([]),
+			{}
+		).catch((reason: unknown) => reason);
+
+		expect(error).toBeInstanceOf(BionicSignError);
+		expect(error).toMatchObject({ code: 'export-pdf-load' });
+	});
+
+	it('maps an encrypted pdf-lib load failure to the shared encrypted-PDF code', async () => {
+		const cause = Object.assign(new Error('encrypted'), { name: 'EncryptedPDFError' });
+		vi.spyOn(PDFDocument, 'load').mockRejectedValueOnce(cause);
+
+		const error = await exportFlattenedPdf(fixture, definition([]), {}).catch(
+			(reason: unknown) => reason
+		);
+
+		expect(error).toBeInstanceOf(BionicSignError);
+		expect(error).toMatchObject({ code: 'pdf-encrypted', cause });
+	});
+
+	it('maps a generic pdf-lib save failure to a stable typed error', async () => {
+		const cause = new Error('save failed');
+		vi.spyOn(PDFDocument.prototype, 'save').mockRejectedValueOnce(cause);
+
+		const error = await exportFlattenedPdf(fixture, definition([]), {}).catch(
+			(reason: unknown) => reason
+		);
+
+		expect(error).toBeInstanceOf(BionicSignError);
+		expect(error).toMatchObject({ code: 'export-pdf-save', cause });
 	});
 });

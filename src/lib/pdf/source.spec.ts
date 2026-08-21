@@ -63,6 +63,35 @@ describe('loadPdfBytes', () => {
 		});
 	});
 
+	it.each(['operation', 'request'] as const)(
+		'combines signals so the %s signal can cancel an active URL load',
+		async (cancelledSignal) => {
+			const operation = new AbortController();
+			const request = new AbortController();
+			const reason = new DOMException(`${cancelledSignal} cancelled`, 'AbortError');
+			let forwardedSignal: AbortSignal | undefined;
+			vi.stubGlobal(
+				'fetch',
+				vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+					forwardedSignal = init?.signal ?? undefined;
+					return new Promise<Response>((resolve, reject) => {
+						forwardedSignal?.addEventListener('abort', () => reject(new TypeError('fetch failed')));
+						queueMicrotask(() => resolve(new Response(new Uint8Array([1]), { status: 200 })));
+					});
+				})
+			);
+
+			const loading = loadPdfBytes('https://example.test/form.pdf', {
+				requestInit: { signal: request.signal },
+				signal: operation.signal
+			});
+			(cancelledSignal === 'operation' ? operation : request).abort(reason);
+
+			await expect(loading).rejects.toBe(reason);
+			expect(forwardedSignal?.aborted).toBe(true);
+		}
+	);
+
 	it('maps non-OK URL responses to a stable typed error', async () => {
 		vi.stubGlobal(
 			'fetch',

@@ -285,7 +285,7 @@ Keep authorization, access control, retention, malware scanning, consent records
 
 ## Theming
 
-Import `bionic-sign/styles.css`, wrap the relevant UI in `.bionic-sign`, and override custom properties on that scope or an ancestor. All selectors in the packaged stylesheet stay below `.bionic-sign`; it does not reset document-wide styles or remove focus outlines.
+Import `bionic-sign/styles.css`, wrap the relevant UI in `.bionic-sign`, and override custom properties directly on that scope (for example, by adding a host class to the same element). The packaged defaults are declared on `.bionic-sign`, so setting tokens only on a separate ancestor does not override them. All selectors in the packaged stylesheet stay below `.bionic-sign`; it does not reset document-wide styles or remove focus outlines.
 
 ```css
 .contract-signing {

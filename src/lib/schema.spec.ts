@@ -123,5 +123,6 @@ describe('applyTextPrefill', () => {
 		expect(result.diagnostics).toEqual([
 			expect.objectContaining({ code: 'unknown-prefill-field', fieldName: 'unknown_name' })
 		]);
+		expect(Object.getPrototypeOf(result.values)).toBeNull();
 	});
 });

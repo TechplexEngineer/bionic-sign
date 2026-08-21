@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FormDefinition, FormValues, SignatureValue } from '../types.js';
 import {
+	cloneValues,
 	createFillerState,
 	firstInvalidField,
 	requiredProgress,
@@ -127,4 +128,33 @@ describe('filler state commands', () => {
 		]);
 		expect(firstInvalidField(definition(), values)?.id).toBe('student-id');
 	});
+
+	it.each([true, false])(
+		'treats a prototype-named %s field as absent unless it is an own value',
+		(required) => {
+			const prototypeDefinition: FormDefinition = {
+				version: 1,
+				fields: [
+					{
+						id: 'prototype-id',
+						name: 'toString',
+						type: 'text',
+						page: 1,
+						rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 },
+						required
+					}
+				]
+			};
+			const empty = cloneValues({});
+
+			expect(Object.getPrototypeOf(empty)).toBeNull();
+			expect(requiredProgress(prototypeDefinition, empty)).toEqual({
+				completed: 0,
+				total: required ? 1 : 0,
+				remaining: required ? 1 : 0
+			});
+			expect(submissionValues(prototypeDefinition, empty)).toEqual({});
+			expect(validateFiller(prototypeDefinition, empty).valid).toBe(!required);
+		}
+	);
 });

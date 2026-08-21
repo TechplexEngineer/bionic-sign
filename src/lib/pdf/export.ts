@@ -24,6 +24,16 @@ interface VisualFieldFrame {
 	toPdf(x: number, y: number): { x: number; y: number };
 }
 
+interface DecodedPng {
+	bytes: Uint8Array;
+	bytesKey: string;
+}
+
+interface SignatureImageCache {
+	byDataUrl: Map<string, PDFImage>;
+	byDecodedBytes: Map<string, PDFImage>;
+}
+
 function throwIfAborted(signal: AbortSignal | undefined): void {
 	if (!signal?.aborted) return;
 	if (signal.reason !== undefined) throw signal.reason;
@@ -46,21 +56,35 @@ function fieldError(
 	);
 }
 
-function isTextValue(value: FormValues[string]): value is TextValue {
-	return value.type === 'text' && typeof value.value === 'string';
+function isTextValue(value: unknown): value is TextValue {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'type' in value &&
+		value.type === 'text' &&
+		'value' in value &&
+		typeof value.value === 'string'
+	);
 }
 
-function isSignatureValue(value: FormValues[string]): value is SignatureValue {
-	return value.type === 'signature' && typeof value.image === 'string';
+function isSignatureValue(value: unknown): value is SignatureValue {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'type' in value &&
+		value.type === 'signature' &&
+		'image' in value &&
+		typeof value.image === 'string'
+	);
 }
 
-function isEmptyValue(field: FormField, value: FormValues[string]): boolean {
+function isEmptyValue(field: FormField, value: unknown): boolean {
 	return field.type === 'text'
 		? isTextValue(value) && value.value.trim().length === 0
 		: isSignatureValue(value) && value.image.length === 0;
 }
 
-function assertValueType(field: FormField, value: FormValues[string]): void {
+function assertValueType(field: FormField, value: unknown): void {
 	const matches = field.type === 'text' ? isTextValue(value) : isSignatureValue(value);
 	if (!matches) {
 		throw fieldError('export-value-type', field, `requires a ${field.type} value`);
@@ -115,7 +139,7 @@ function visualFieldFrame(
 	}
 }
 
-function decodePngDataUrl(field: FormField, dataUrl: string): Uint8Array {
+function decodePngDataUrl(field: FormField, dataUrl: string): DecodedPng {
 	const match = PNG_DATA_URL_PATTERN.exec(dataUrl);
 	if (!match || match[1].length === 0) {
 		throw fieldError('export-invalid-signature', field, 'must contain a PNG data URL');
@@ -132,25 +156,31 @@ function decodePngDataUrl(field: FormField, dataUrl: string): Uint8Array {
 	if (PNG_SIGNATURE.some((byte, index) => bytes[index] !== byte)) {
 		throw fieldError('export-invalid-signature', field, 'contains invalid PNG data');
 	}
-	return bytes;
+	return { bytes, bytesKey: binary };
 }
 
 async function embedSignature(
 	document: PDFDocument,
 	field: FormField,
 	dataUrl: string,
-	cache: Map<string, PDFImage>,
+	cache: SignatureImageCache,
 	signal: AbortSignal | undefined
 ): Promise<PDFImage> {
-	const cached = cache.get(dataUrl);
-	if (cached) return cached;
+	const dataUrlCached = cache.byDataUrl.get(dataUrl);
+	if (dataUrlCached) return dataUrlCached;
 
-	const bytes = decodePngDataUrl(field, dataUrl);
+	const { bytes, bytesKey } = decodePngDataUrl(field, dataUrl);
+	const bytesCached = cache.byDecodedBytes.get(bytesKey);
+	if (bytesCached) {
+		cache.byDataUrl.set(dataUrl, bytesCached);
+		return bytesCached;
+	}
 	throwIfAborted(signal);
 	try {
 		const image = await document.embedPng(bytes);
 		throwIfAborted(signal);
-		cache.set(dataUrl, image);
+		cache.byDataUrl.set(dataUrl, image);
+		cache.byDecodedBytes.set(bytesKey, image);
 		return image;
 	} catch (cause) {
 		if (cause instanceof BionicSignError) throw cause;
@@ -184,7 +214,10 @@ export async function exportFlattenedPdf(
 
 	const font = await document.embedFont(StandardFonts.Helvetica);
 	throwIfAborted(signal);
-	const images = new Map<string, PDFImage>();
+	const images: SignatureImageCache = {
+		byDataUrl: new Map(),
+		byDecodedBytes: new Map()
+	};
 
 	for (const field of definition.fields) {
 		throwIfAborted(signal);

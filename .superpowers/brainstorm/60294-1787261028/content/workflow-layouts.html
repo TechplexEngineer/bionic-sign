@@ -1,0 +1,52 @@
+<h2>Choose the workflow layout</h2>
+<p class="subtitle">Each option uses the same library capabilities; the difference is how admins place fields and how signers move through them.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">A · Focused workspace</div>
+        <div class="mockup-body" style="display:grid;grid-template-columns:150px 1fr 170px;gap:10px;min-height:220px">
+          <div class="mock-sidebar"><strong>Fields</strong><br><br>＋ Text<br><br>＋ Signature<br><br><small>Pages<br>1&nbsp;&nbsp;2&nbsp;&nbsp;3</small></div>
+          <div class="placeholder" style="position:relative;padding:18px">PDF page<div style="position:absolute;left:18%;top:35%;border:2px solid currentColor;padding:7px 18px">Student name</div><div style="position:absolute;left:44%;top:70%;border:2px solid currentColor;padding:10px 30px">Signature</div></div>
+          <div class="mock-content"><strong>Selected field</strong><br><br><input class="mock-input" value="parent_signature"><br><br>☑ Required<br><br><button class="mock-button">Delete</button></div>
+        </div>
+      </div>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Signer</div>
+        <div class="mockup-body" style="display:grid;grid-template-columns:1fr 190px;gap:10px;min-height:130px"><div class="placeholder">PDF with active field</div><div class="mock-content"><strong>2 of 4 complete</strong><br><br>Next: Parent signature<br><br><button class="mock-button">Complete field</button></div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A · Focused workspace</h3><p>Three-pane admin editor and guided signer rail. Efficient on desktop and collapses into drawers on mobile.</p></div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">B · Document first</div>
+        <div class="mockup-body" style="min-height:220px"><div class="mock-nav">Text field &nbsp; Signature &nbsp; | &nbsp; Undo &nbsp; Page 1 / 3 &nbsp; <button class="mock-button">Export schema</button></div><div class="placeholder" style="position:relative;margin-top:10px;height:165px">PDF page<div style="position:absolute;left:22%;top:28%;border:2px solid currentColor;padding:7px 20px">Student name</div><div style="position:absolute;left:48%;top:68%;border:2px solid currentColor;padding:10px 32px">Signature</div></div></div>
+      </div>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Signer</div>
+        <div class="mockup-body" style="min-height:130px"><div class="mock-nav">2 of 4 complete &nbsp; • &nbsp; Previous &nbsp; Next required field</div><div class="placeholder" style="margin-top:10px;height:80px">PDF with inline field editor</div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B · Document first</h3><p>Maximum PDF space with floating or inline controls. Visually clean, but field properties are less discoverable.</p></div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">C · Step-by-step wizard</div>
+        <div class="mockup-body" style="min-height:220px"><div class="mock-nav">1 Upload PDF &nbsp; → &nbsp; <strong>2 Place fields</strong> &nbsp; → &nbsp; 3 Review</div><div style="display:grid;grid-template-columns:130px 1fr;gap:10px;margin-top:10px"><div class="mock-sidebar">Text<br><br>Signature<br><br>Pages</div><div class="placeholder" style="height:165px">PDF page</div></div></div>
+      </div>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Signer</div>
+        <div class="mockup-body" style="min-height:130px"><div class="mock-nav"><strong>Student name</strong> → Parent name → Signature → Review</div><div class="mock-content" style="margin-top:10px"><input class="mock-input" value="Jordan Lee"> <button class="mock-button">Save &amp; continue</button></div></div>
+      </div>
+    </div>
+    <div class="card-body"><h3>C · Step-by-step wizard</h3><p>Strong guidance and review checkpoints. Easier for first-time users, but separates entry from the document’s visual context.</p></div>
+  </div>
+</div>
+
+<p class="subtitle"><strong>Recommendation:</strong> A. It keeps PDF context visible, makes field properties easy to edit, and supports both expert admins and occasional signers.</p>

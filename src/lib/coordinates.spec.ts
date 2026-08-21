@@ -103,6 +103,24 @@ describe('PDF coordinate transformations', () => {
 		);
 	});
 
+	it.each([
+		[0, { x: 50, y: 370, width: 120, height: 80 }],
+		[90, { x: 80, y: 170, width: 60, height: 160 }],
+		[180, { x: 170, y: 210, width: 120, height: 80 }],
+		[270, { x: 200, y: 330, width: 60, height: 160 }]
+	] as const)(
+		'includes a non-zero visible-box origin on a %i-degree page',
+		(rotation, expected) => {
+			expectRectCloseTo(
+				normalizedToPdf(
+					{ x: 0.1, y: 0.2, width: 0.4, height: 0.2 },
+					{ x: 20, y: 130, width: 300, height: 400, rotation }
+				),
+				expected
+			);
+		}
+	);
+
 	it('maps edge rectangles correctly on a 270-degree rotated page', () => {
 		expect(
 			normalizedToPdf(

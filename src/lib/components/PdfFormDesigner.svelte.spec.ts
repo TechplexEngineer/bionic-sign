@@ -74,6 +74,16 @@ function definition(): FormDefinition {
 	};
 }
 
+function invalidDefinition(kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'): FormDefinition {
+	const invalid = definition();
+	if (kind === 'duplicate-id') invalid.fields[1].id = invalid.fields[0].id;
+	if (kind === 'duplicate-name') invalid.fields[1].name = invalid.fields[0].name;
+	if (kind === 'malformed-rect') {
+		invalid.fields[0].rect = { x: 0.9, y: 0.2, width: 0.3, height: 0.1 };
+	}
+	return invalid;
+}
+
 describe('PdfFormDesigner', () => {
 	beforeEach(async () => {
 		await page.viewport(1000, 800);
@@ -84,6 +94,54 @@ describe('PdfFormDesigner', () => {
 
 	afterEach(async () => {
 		await page.viewport(1000, 800);
+	});
+
+	it.each(['duplicate-id', 'duplicate-name', 'malformed-rect'] as const)(
+		'reports and recovers from a %s definition at the prop boundary',
+		async (kind) => {
+			usePdf();
+			const onerror = vi.fn();
+			const source = new Uint8Array([1]);
+			const result = render(PdfFormDesigner, {
+				source,
+				definition: invalidDefinition(kind),
+				onerror
+			});
+
+			await expect.element(page.getByRole('alert')).toBeVisible();
+			expect(onerror).toHaveBeenCalledWith(
+				expect.objectContaining({ code: 'invalid-form-definition' })
+			);
+			await expect.element(page.getByRole('button', { name: 'Add text field' })).toBeDisabled();
+
+			await result.rerender({ source, definition: definition(), onerror });
+			await expect
+				.element(page.getByRole('button', { name: 'Text field "student_name"' }))
+				.toBeVisible();
+			await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
+		}
+	);
+
+	it('rejects fields beyond the loaded document page count and recovers after correction', async () => {
+		usePdf(1);
+		const onerror = vi.fn();
+		const source = new Uint8Array([1]);
+		const result = render(PdfFormDesigner, {
+			source,
+			definition: definition(),
+			onerror
+		});
+
+		await vi.waitFor(() =>
+			expect(onerror).toHaveBeenCalledWith(
+				expect.objectContaining({ code: 'definition-page-out-of-range' })
+			)
+		);
+		await expect.element(page.getByRole('button', { name: 'Add text field' })).toBeDisabled();
+
+		await result.rerender({ source, definition: { version: 1, fields: [] }, onerror });
+		await expect.element(page.getByRole('button', { name: 'Add text field' })).toBeEnabled();
+		await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
 	});
 
 	it('composes the three panes, selects pages, and adds immediately selected fields immutably', async () => {
