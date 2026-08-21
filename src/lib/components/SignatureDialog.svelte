@@ -15,7 +15,7 @@
 	const uid = $props.id();
 	let dialog: HTMLDialogElement;
 	let cancelButton: HTMLButtonElement;
-	let pad: { clear(): void; toValue(): SignatureValue | undefined };
+	let pad = $state<{ clear(): void }>();
 	let draft = $state<SignatureValue>();
 	let empty = $state(true);
 
@@ -33,15 +33,14 @@
 	}
 
 	function clearDraft(): void {
-		pad.clear();
+		pad?.clear();
 		draft = undefined;
 		empty = true;
 	}
 
 	function apply(): void {
-		const captured = pad.toValue() ?? draft;
-		if (!captured || empty) return;
-		onapply?.(copyValue(captured)!);
+		if (!draft || empty) return;
+		onapply?.(copyValue(draft)!);
 	}
 
 	$effect(() => {
@@ -78,15 +77,19 @@
 			<h2 id={`${uid}-title`}>Sign {fieldName}</h2>
 			<p>Draw a signature for this field. It will not be reused for other fields.</p>
 		</header>
-		<SignaturePad
-			bind:this={pad}
-			value={draft}
-			onchange={(next) => {
-				draft = copyValue(next);
-				empty = next === undefined;
-			}}
-			onemptychange={(nextEmpty) => (empty = nextEmpty)}
-		/>
+		{#if open}
+			{#key fieldName}
+				<SignaturePad
+					bind:this={pad}
+					value={draft}
+					onchange={(next) => {
+						draft = copyValue(next);
+						empty = next === undefined;
+					}}
+					onemptychange={(nextEmpty) => (empty = nextEmpty)}
+				/>
+			{/key}
+		{/if}
 		<footer>
 			<button
 				type="button"

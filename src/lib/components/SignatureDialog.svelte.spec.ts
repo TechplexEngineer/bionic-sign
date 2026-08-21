@@ -1,22 +1,31 @@
 import { page } from 'vitest/browser';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import SignatureDialog from './SignatureDialog.svelte';
 
 const signaturePadMock = vi.hoisted(() => {
+	const completedLoads: string[] = [];
+	const startedLoads: string[] = [];
+	const loadGates = new Map<string, Promise<void>>();
+
 	class FakeSignaturePad extends EventTarget {
 		private empty = true;
+		private image = 'data:image/png;base64,c2lnbmF0dXJl';
 		readonly clear = vi.fn(() => {
 			this.empty = true;
 		});
 		readonly fromData = vi.fn();
-		readonly fromDataURL = vi.fn(async () => {
+		readonly fromDataURL = vi.fn(async (image: string) => {
+			startedLoads.push(image);
+			await loadGates.get(image);
 			this.empty = false;
+			this.image = image;
+			completedLoads.push(image);
 		});
 		readonly isEmpty = vi.fn(() => this.empty);
 		readonly off = vi.fn();
 		readonly toData = vi.fn(() => []);
-		readonly toDataURL = vi.fn(() => 'data:image/png;base64,c2lnbmF0dXJl');
+		readonly toDataURL = vi.fn(() => this.image);
 
 		constructor(canvas: HTMLCanvasElement) {
 			super();
@@ -27,10 +36,24 @@ const signaturePadMock = vi.hoisted(() => {
 		}
 	}
 
-	return { FakeSignaturePad };
+	return { completedLoads, FakeSignaturePad, loadGates, startedLoads };
 });
 
 vi.mock('signature_pad', () => ({ default: signaturePadMock.FakeSignaturePad }));
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+	let resolve!: () => void;
+	const promise = new Promise<void>((resolvePromise) => {
+		resolve = resolvePromise;
+	});
+	return { promise, resolve };
+}
+
+beforeEach(() => {
+	signaturePadMock.completedLoads.length = 0;
+	signaturePadMock.startedLoads.length = 0;
+	signaturePadMock.loadGates.clear();
+});
 
 describe('SignatureDialog', () => {
 	it('opens with focus inside and guards Apply while the capture is empty', async () => {
@@ -75,5 +98,57 @@ describe('SignatureDialog', () => {
 		await page.getByRole('button', { name: 'Cancel signature' }).click();
 		expect(oncancel).toHaveBeenCalledOnce();
 		expect(onapply).toHaveBeenCalledOnce();
+	});
+
+	it('never applies the previous field while the newly opened PNG is still loading', async () => {
+		const first = { type: 'signature', image: 'data:image/png;base64,Zmlyc3Q=' } as const;
+		const second = { type: 'signature', image: 'data:image/png;base64,c2Vjb25k' } as const;
+		const secondLoad = deferred();
+		const onapply = vi.fn();
+		const oncancel = vi.fn();
+		const result = render(SignatureDialog, {
+			open: true,
+			fieldName: 'first_signature',
+			value: first,
+			onapply,
+			oncancel
+		});
+
+		await vi.waitFor(() => expect(signaturePadMock.completedLoads).toContain(first.image));
+		await page.getByRole('button', { name: 'Apply signature' }).click();
+		expect(onapply).toHaveBeenLastCalledWith(first);
+
+		await result.rerender({
+			open: false,
+			fieldName: 'first_signature',
+			value: first,
+			onapply,
+			oncancel
+		});
+		signaturePadMock.loadGates.set(second.image, secondLoad.promise);
+		await result.rerender({
+			open: true,
+			fieldName: 'second_signature',
+			value: second,
+			onapply,
+			oncancel
+		});
+		await vi.waitFor(() => expect(signaturePadMock.startedLoads).toContain(second.image));
+		await expect.element(page.getByRole('button', { name: 'Apply signature' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Apply signature' }).click();
+
+		expect(onapply).toHaveBeenLastCalledWith(second);
+		expect(onapply).not.toHaveBeenLastCalledWith(first);
+		await result.rerender({
+			open: false,
+			fieldName: 'second_signature',
+			value: second,
+			onapply,
+			oncancel
+		});
+		secondLoad.resolve();
+		await vi.waitFor(() => expect(signaturePadMock.completedLoads).toContain(second.image));
+		expect(onapply).toHaveBeenCalledTimes(2);
+		expect(onapply).toHaveBeenLastCalledWith(second);
 	});
 });

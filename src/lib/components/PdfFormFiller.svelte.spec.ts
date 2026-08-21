@@ -209,6 +209,55 @@ describe('PdfFormFiller', () => {
 		expect(pdfMocks.exportFlattenedPdf).not.toHaveBeenCalled();
 	});
 
+	it('replays first-invalid focus after validation is requested while the viewer loads', async () => {
+		const viewerLoad = deferred<Uint8Array>();
+		pdfMocks.loadPdfBytes.mockReturnValueOnce(viewerLoad.promise);
+		render(PdfFormFiller, {
+			source: new Uint8Array([1]),
+			definition: definition()
+		});
+
+		await expect.element(page.getByText('Loading PDF…')).toBeVisible();
+		await page.getByRole('button', { name: 'Submit signed PDF' }).click();
+		const fallback = page.getByRole('button', { name: 'Go to student_name' }).element();
+		expect(document.activeElement).toBe(fallback);
+		await expect.element(fallback).toHaveAttribute('aria-current', 'true');
+
+		viewerLoad.resolve(new Uint8Array([1, 2, 3]));
+		await expect.element(page.getByRole('textbox', { name: 'student_name' })).toBeVisible();
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(
+				page.getByRole('textbox', { name: 'student_name' }).element()
+			)
+		);
+	});
+
+	it('replays rail navigation focus after the selected field overlay mounts', async () => {
+		const viewerLoad = deferred<Uint8Array>();
+		pdfMocks.loadPdfBytes.mockReturnValueOnce(viewerLoad.promise);
+		render(PdfFormFiller, {
+			source: new Uint8Array([1]),
+			definition: definition()
+		});
+
+		await expect.element(page.getByText('Loading PDF…')).toBeVisible();
+		const railButton = page.getByRole('button', { name: 'Go to parent_signature' });
+		await railButton.click();
+		expect(document.activeElement).toBe(railButton.element());
+		await expect.element(railButton).toHaveAttribute('aria-current', 'true');
+
+		viewerLoad.resolve(new Uint8Array([1, 2, 3]));
+		await expect.element(page.getByRole('button', { name: 'Sign parent_signature' })).toBeVisible();
+		await expect
+			.element(page.getByLabelText('PDF page 2').element().parentElement!)
+			.toHaveAttribute('aria-current', 'page');
+		await vi.waitFor(() =>
+			expect(document.activeElement).toBe(
+				page.getByRole('button', { name: 'Sign parent_signature' }).element()
+			)
+		);
+	});
+
 	it('preserves values after export errors and exposes a busy state', async () => {
 		const pending = deferred<Uint8Array>();
 		pdfMocks.exportFlattenedPdf.mockReturnValueOnce(pending.promise);

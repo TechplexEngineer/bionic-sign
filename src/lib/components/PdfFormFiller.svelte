@@ -61,6 +61,8 @@
 	let signatureFieldId = $state<string>();
 	let signatureDialogOpen = $state(false);
 	let busy = $state(false);
+	let viewerReady = $state(false);
+	let pendingFocus = $state<{ id: string; page: number }>();
 	let lastValidation = $state<ValidationResult>();
 	let activeOperation: Operation | undefined;
 	let progress = $derived(requiredProgress(localDefinition, values));
@@ -233,17 +235,43 @@
 	}
 
 	async function focusField(id: string, page: number): Promise<void> {
+		pendingFocus = { id, page };
 		selectedFieldId = id;
 		currentPage = page;
 		await tick();
-		const control = Array.from(root.querySelectorAll<HTMLElement>('[data-filler-field-id]')).find(
-			(element) => element.dataset.fillerFieldId === id
-		);
-		control?.focus();
+		replayPendingFocus();
 	}
 
 	function navigateToField(id: string, page: number): void {
 		void focusField(id, page);
+	}
+
+	function replayPendingFocus(): void {
+		if (!pendingFocus) return;
+		if (viewerReady) {
+			const control = Array.from(root.querySelectorAll<HTMLElement>('[data-filler-field-id]')).find(
+				(element) => element.dataset.fillerFieldId === pendingFocus?.id
+			);
+			if (control) {
+				control.focus();
+				pendingFocus = undefined;
+				return;
+			}
+		}
+
+		const fallback = Array.from(
+			root.querySelectorAll<HTMLButtonElement>('[data-filler-nav-id]')
+		).find((element) => element.dataset.fillerNavId === pendingFocus?.id);
+		fallback?.focus();
+	}
+
+	function handlePageCount(pageCount: number): void {
+		untrack(() => {
+			viewerReady = pageCount > 0;
+			if (viewerReady && pendingFocus) {
+				void tick().then(replayPendingFocus);
+			}
+		});
 	}
 
 	function fieldIsInvalid(name: string): boolean {
@@ -275,6 +303,8 @@
 			selectedFieldId = undefined;
 			signatureFieldId = undefined;
 			signatureDialogOpen = false;
+			viewerReady = false;
+			pendingFocus = undefined;
 			lastValidation = undefined;
 			for (const diagnostic of initial.diagnostics) {
 				ondiagnostic?.({ ...diagnostic });
@@ -335,6 +365,7 @@
 			{#each localDefinition.fields as field (field.id)}
 				<button
 					type="button"
+					data-filler-nav-id={field.id}
 					class:complete={submissionValues(localDefinition, values)[field.name] !== undefined}
 					class:invalid={fieldIsInvalid(field.name)}
 					aria-label={`Go to ${field.name}`}
@@ -367,7 +398,15 @@
 				+
 			</button>
 		</div>
-		<PdfViewer {source} {requestInit} bind:currentPage bind:zoom overlay={fieldLayer} {onerror} />
+		<PdfViewer
+			{source}
+			{requestInit}
+			bind:currentPage
+			bind:zoom
+			overlay={fieldLayer}
+			onpagecountchange={handlePageCount}
+			{onerror}
+		/>
 	</main>
 
 	<footer class="submission-controls">
