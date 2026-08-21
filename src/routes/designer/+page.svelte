@@ -3,6 +3,7 @@
 	import {
 		PdfFormDesigner,
 		cloneDefinition,
+		validateDefinition,
 		type FormDefinition,
 		type PdfSource
 	} from '$lib/index.js';
@@ -15,8 +16,10 @@
 	let sourceUrl = $state(demoPdfUrl);
 	let definition = $state<FormDefinition>({ version: 1, fields: [] });
 	let sourceStatus = $state('Demo PDF loaded from URL.');
+	let schemaStatus = $state('Start with an empty schema or load an existing JSON file.');
 	let errorMessage = $state('');
 	let sourceRevision = 0;
+	let schemaRevision = 0;
 	let schemaJson = $derived(JSON.stringify(definition, null, 2));
 
 	function messageFor(reason: unknown): string {
@@ -56,6 +59,27 @@
 		} catch (reason) {
 			if (revision !== sourceRevision) return;
 			errorMessage = `Could not read ${file.name}: ${messageFor(reason)}`;
+		}
+	}
+
+	async function loadSchemaFile(event: Event): Promise<void> {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		const revision = ++schemaRevision;
+		schemaStatus = `Reading ${file.name}…`;
+		errorMessage = '';
+		try {
+			const nextDefinition = validateDefinition(JSON.parse(await file.text()) as unknown);
+			if (revision !== schemaRevision) return;
+			definition = cloneDefinition(nextDefinition);
+			const fieldCount = nextDefinition.fields.length;
+			schemaStatus = `Schema ready: ${file.name} · ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}`;
+		} catch (reason) {
+			if (revision !== schemaRevision) return;
+			errorMessage = `Could not load ${file.name}: ${messageFor(reason)}`;
+			schemaStatus = 'Schema file was rejected.';
 		}
 	}
 
@@ -160,9 +184,14 @@
 					<span>PDF file</span>
 					<input type="file" accept="application/pdf,.pdf" onchange={loadFile} />
 				</label>
+				<label class="file-control">
+					<span>Schema JSON file</span>
+					<input type="file" accept="application/json,.json" onchange={loadSchemaFile} />
+				</label>
 			</div>
 
 			<p role="status" aria-label="PDF source status" aria-live="polite">{sourceStatus}</p>
+			<p role="status" aria-label="Schema status" aria-live="polite">{schemaStatus}</p>
 			{#if errorMessage}
 				<p class="error" role="alert">{errorMessage}</p>
 			{/if}
@@ -393,7 +422,7 @@
 
 	.source-controls {
 		display: grid;
-		grid-template-columns: minmax(0, 1.5fr) auto minmax(14rem, 0.5fr);
+		grid-template-columns: minmax(0, 1.5fr) auto repeat(2, minmax(12rem, 0.5fr));
 		align-items: end;
 		gap: 1rem;
 		margin: 1.35rem 0 0.85rem 3.2rem;

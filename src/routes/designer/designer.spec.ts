@@ -89,6 +89,52 @@ describe('Bionic Sign demo landing and designer', () => {
 		});
 	});
 
+	it('loads an existing schema file into the designer for editing', async () => {
+		render(DesignerPage);
+		const importedDefinition = {
+			version: 1,
+			fields: [
+				{
+					id: 'student-name-id',
+					name: 'student_name',
+					type: 'text',
+					page: 1,
+					rect: { x: 0.15, y: 0.2, width: 0.35, height: 0.08 },
+					required: false
+				}
+			]
+		};
+
+		await page.getByLabelText('Schema JSON file').upload(
+			new File([JSON.stringify(importedDefinition)], 'existing-form.json', {
+				type: 'application/json'
+			})
+		);
+
+		await expect
+			.element(page.getByRole('status', { name: 'Schema status' }))
+			.toHaveTextContent('Schema ready: existing-form.json · 1 field');
+		await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+		await expect.element(page.getByRole('textbox', { name: 'Name' })).toHaveValue('student_name');
+		await expect.element(page.getByLabelText('Required')).not.toBeChecked();
+	});
+
+	it('rejects invalid schema files without replacing the current definition', async () => {
+		render(DesignerPage);
+		await page.getByRole('button', { name: 'Add text field' }).click();
+		await page.getByRole('textbox', { name: 'Name' }).fill('existing_field');
+
+		await page
+			.getByLabelText('Schema JSON file')
+			.upload(new File(['{"version":1,"fields":'], 'broken.json', { type: 'application/json' }));
+
+		await expect.element(page.getByRole('alert')).toHaveTextContent('Could not load broken.json');
+		await expect
+			.element(page.getByRole('status', { name: 'Schema status' }))
+			.toHaveTextContent('Schema file was rejected.');
+		await expect.element(page.getByRole('textbox', { name: 'Name' })).toHaveValue('existing_field');
+	});
+
 	it('keeps small designer panel text at WCAG AA contrast on its rendered backgrounds', async () => {
 		render(DesignerPage);
 
