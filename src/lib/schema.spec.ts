@@ -81,7 +81,13 @@ describe('validateDefinition', () => {
 
 	it('defaults an omitted required value to true', () => {
 		const input = field('a', 'student');
-		const { required: _required, ...fieldWithoutRequired } = input;
+		const fieldWithoutRequired = {
+			id: input.id,
+			name: input.name,
+			type: input.type,
+			page: input.page,
+			rect: input.rect
+		};
 
 		expect(validateDefinition({ version: 1, fields: [fieldWithoutRequired] })).toEqual({
 			version: 1,
