@@ -114,11 +114,11 @@
 		box-sizing: border-box;
 	}
 
-	:global(html) {
+	:global(html:has(.landing-shell)) {
 		background: #07110e;
 	}
 
-	:global(body) {
+	:global(body:has(.landing-shell)) {
 		margin: 0;
 		background:
 			radial-gradient(circle at 85% 18%, rgb(132 255 184 / 12%), transparent 28rem), #07110e;

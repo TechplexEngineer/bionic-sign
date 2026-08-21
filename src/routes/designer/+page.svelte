@@ -127,7 +127,7 @@
 	/>
 </svelte:head>
 
-<div class="app-shell">
+<div class="app-shell designer-page">
 	<header class="app-header">
 		<a class="brand" href={resolve('/')} aria-label="Bionic Sign home">
 			<span class="brand-mark" aria-hidden="true">B</span>
@@ -249,11 +249,11 @@
 		box-sizing: border-box;
 	}
 
-	:global(html) {
+	:global(html:has(.designer-page)) {
 		background: #f2f1ea;
 	}
 
-	:global(body) {
+	:global(body:has(.designer-page)) {
 		margin: 0;
 		background: #f2f1ea;
 		color: #152019;

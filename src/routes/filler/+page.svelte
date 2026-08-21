@@ -187,7 +187,7 @@
 	/>
 </svelte:head>
 
-<div class="app-shell">
+<div class="app-shell filler-page">
 	<header class="app-header">
 		<a class="brand" href={resolve('/')} aria-label="Bionic Sign home">
 			<span class="brand-mark" aria-hidden="true">B</span>
@@ -358,11 +358,11 @@
 		box-sizing: border-box;
 	}
 
-	:global(html) {
+	:global(html:has(.filler-page)) {
 		background: #eff2ed;
 	}
 
-	:global(body) {
+	:global(body:has(.filler-page)) {
 		margin: 0;
 		background:
 			linear-gradient(90deg, transparent 49.9%, rgb(26 54 37 / 4%) 50%, transparent 50.1%), #eff2ed;
