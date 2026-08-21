@@ -1,9 +1,11 @@
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 import { page } from 'vitest/browser';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { FormDefinition, FormSubmission } from '../types.js';
 import PdfFormFiller from './PdfFormFiller.svelte';
+
+import '../styles.css';
 
 const pdfMocks = vi.hoisted(() => ({
 	exportFlattenedPdf: vi.fn(),
@@ -125,7 +127,28 @@ beforeEach(() => {
 	usePdf();
 });
 
+afterEach(() => {
+	document.body.classList.remove('bionic-sign');
+	document.body.style.removeProperty('--bionic-sign-required');
+});
+
 describe('PdfFormFiller', () => {
+	it('applies the required theme token to the visible required indicator', async () => {
+		document.body.classList.add('bionic-sign');
+		document.body.style.setProperty('--bionic-sign-required', 'rgb(145 23 90)');
+		render(PdfFormFiller, {
+			source: new Uint8Array([1]),
+			definition: definition()
+		});
+
+		const fieldButton = page.getByRole('button', { name: 'Go to student_name' });
+		await expect.element(fieldButton).toBeVisible();
+		const indicator = fieldButton.element().querySelector('[data-bionic-sign-state="required"]');
+
+		expect(indicator).not.toBeNull();
+		expect(getComputedStyle(indicator!).color).toBe('rgb(145, 23, 90)');
+	});
+
 	it('applies editable text prefills, reports diagnostics, and navigates fields with progress', async () => {
 		const ondiagnostic = vi.fn();
 		render(PdfFormFiller, {

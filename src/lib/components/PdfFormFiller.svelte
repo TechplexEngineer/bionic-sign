@@ -374,7 +374,10 @@
 				>
 					<span>{field.name}</span>
 					<small>
-						{field.required ? 'Required' : 'Optional'} ·
+						<span data-bionic-sign-state={field.required ? 'required' : undefined}>
+							{field.required ? 'Required' : 'Optional'}
+						</span>
+						·
 						{submissionValues(localDefinition, values)[field.name] === undefined
 							? 'Incomplete'
 							: 'Complete'}
