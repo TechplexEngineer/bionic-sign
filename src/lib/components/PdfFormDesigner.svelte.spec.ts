@@ -74,7 +74,9 @@ function definition(): FormDefinition {
 	};
 }
 
-function invalidDefinition(kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'): FormDefinition {
+function invalidDefinition(
+	kind: 'duplicate-id' | 'duplicate-name' | 'malformed-rect'
+): FormDefinition {
 	const invalid = definition();
 	if (kind === 'duplicate-id') invalid.fields[1].id = invalid.fields[0].id;
 	if (kind === 'duplicate-name') invalid.fields[1].name = invalid.fields[0].name;
@@ -272,6 +274,30 @@ describe('PdfFormDesigner', () => {
 		await page.getByRole('button', { name: 'Delete field' }).click();
 		await expect.element(page.getByText('Select a field to edit its properties.')).toBeVisible();
 		expect(changes.at(-1)?.fields.map(({ id }) => id)).toEqual(['signature-id']);
+	});
+
+	it('keeps zoomed PDF overflow inside the center document pane', async () => {
+		usePdf();
+		const result = render(PdfFormDesigner, {
+			source: new Uint8Array([1]),
+			definition: definition()
+		});
+		await expect.element(page.getByLabelText('PDF page 2')).toBeVisible();
+
+		const designer = result.container.querySelector<HTMLElement>('.pdf-form-designer')!;
+		const documentPane = page.getByRole('main', { name: 'PDF form canvas' }).element();
+		const initialDesignerHeight = designer.getBoundingClientRect().height;
+
+		for (let index = 0; index < 4; index += 1) {
+			await page.getByRole('button', { name: 'Zoom in' }).click();
+		}
+
+		await vi.waitFor(() =>
+			expect(documentPane.scrollHeight).toBeGreaterThan(documentPane.clientHeight)
+		);
+		expect(designer.getBoundingClientRect().height).toBe(initialDesignerHeight);
+		documentPane.scrollTop = 100;
+		expect(documentPane.scrollTop).toBe(100);
 	});
 
 	it('synchronizes a rejected name draft when a valid definition prop replaces it', async () => {

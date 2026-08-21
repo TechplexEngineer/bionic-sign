@@ -348,6 +348,8 @@
 		--designer-danger: var(--bionic-sign-danger, #b91c1c);
 		position: relative;
 		display: grid;
+		grid-template-rows: auto minmax(0, 1fr);
+		height: var(--bionic-sign-designer-height, min(48rem, calc(100dvh - 2rem)));
 		min-height: 32rem;
 		border: 1px solid var(--designer-border);
 		border-radius: 0.75rem;
@@ -372,6 +374,7 @@
 		display: grid;
 		grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr) minmax(14rem, 18rem);
 		min-width: 0;
+		min-height: 0;
 	}
 
 	.fields-pane,
@@ -391,6 +394,7 @@
 
 	.document-pane {
 		min-width: 0;
+		min-height: 0;
 		padding: 1rem;
 		overflow: auto;
 	}
