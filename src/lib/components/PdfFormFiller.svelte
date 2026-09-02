@@ -339,6 +339,7 @@
 					data-filler-field-id={field.id}
 					aria-label={field.name}
 					aria-invalid={fieldIsInvalid(field.name) ? 'true' : undefined}
+					placeholder={field.placeholder ?? field.name}
 					value={textValue(field.name)}
 					onfocus={() => (selectedFieldId = field.id)}
 					oninput={(event) => editText(field.name, event)}
@@ -365,7 +366,9 @@
 					onfocus={() => (selectedFieldId = field.id)}
 					onclick={() => openSignature(field.id, field.page)}
 				>
-					{values[field.name]?.type === 'signature' ? 'Edit signature' : 'Sign here'}
+					{values[field.name]?.type === 'signature'
+						? 'Edit signature'
+						: (field.placeholder ?? field.name)}
 				</button>
 			{/if}
 		</div>

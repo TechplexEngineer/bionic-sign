@@ -151,6 +151,29 @@ afterEach(() => {
 });
 
 describe('PdfFormFiller', () => {
+	it('renders custom placeholders and falls back to field names', async () => {
+		const form = definition();
+		const textField = form.fields[0];
+		const signatureField = form.fields[1];
+		if (textField.type !== 'text' || signatureField.type !== 'signature') {
+			throw new TypeError('Placeholder fixture fields have unexpected types');
+		}
+		form.fields[0] = { ...textField, placeholder: 'Student name' };
+		form.fields[1] = { ...signatureField, placeholder: 'Parent signs here' };
+		render(PdfFormFiller, { source: new Uint8Array([1]), definition: form });
+
+		await expect
+			.element(page.getByRole('textbox', { name: 'student_name' }))
+			.toHaveAttribute('placeholder', 'Student name');
+		await page.getByRole('button', { name: 'Go to parent_signature' }).click();
+		await expect
+			.element(page.getByRole('button', { name: 'Sign parent_signature' }))
+			.toHaveTextContent('Parent signs here');
+		await expect
+			.element(page.getByRole('button', { name: 'Sign witness_signature' }))
+			.toHaveTextContent('witness_signature');
+	});
+
 	it('renders dropdown options and submits the selected string value', async () => {
 		const form: FormDefinition = {
 			version: 1,

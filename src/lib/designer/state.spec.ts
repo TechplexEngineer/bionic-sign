@@ -8,6 +8,7 @@ import {
 	renameField,
 	toggleRequired,
 	updateDropdownOptions,
+	updateFieldPlaceholder,
 	updateFieldRect
 } from './state.js';
 
@@ -72,6 +73,23 @@ describe('designer state commands', () => {
 		expect(original.fields[0].name).toBe('student');
 		expect(renamed).not.toBe(original);
 		expect(renamed.fields[0]).not.toBe(original.fields[0]);
+	});
+
+	it('sets and clears a text or signature placeholder without mutating the input', () => {
+		const original = definition(field('student-id', 'student'));
+		const updated = updateFieldPlaceholder(original, 'student-id', 'Student name');
+		const cleared = updateFieldPlaceholder(updated, 'student-id', '');
+
+		expect(updated.fields[0]).toEqual(expect.objectContaining({ placeholder: 'Student name' }));
+		expect(cleared.fields[0]).not.toHaveProperty('placeholder');
+		expect(original.fields[0]).not.toHaveProperty('placeholder');
+	});
+
+	it('rejects placeholders on dropdown fields', () => {
+		const original = addField(definition(), 'dropdown', 1);
+		expect(() => updateFieldPlaceholder(original, original.fields[0].id, 'Choose')).toThrow(
+			/dropdown/i
+		);
 	});
 
 	it('rejects a rename that duplicates another field name', () => {
