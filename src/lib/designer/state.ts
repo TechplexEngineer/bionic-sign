@@ -100,6 +100,23 @@ export function renameField(definition: FormDefinition, id: string, name: string
 	return updateField(definition, id, (field) => ({ ...field, name }));
 }
 
+export function updateFieldPlaceholder(
+	definition: FormDefinition,
+	id: string,
+	placeholder: string
+): FormDefinition {
+	return updateField(definition, id, (field) => {
+		if (field.type === 'dropdown') {
+			throw new TypeError(`Field "${field.name}" is a dropdown`);
+		}
+		if (placeholder.length === 0) {
+			const { placeholder: _placeholder, ...withoutPlaceholder } = field;
+			return withoutPlaceholder;
+		}
+		return { ...field, placeholder };
+	});
+}
+
 export function updateFieldRect(
 	definition: FormDefinition,
 	id: string,
