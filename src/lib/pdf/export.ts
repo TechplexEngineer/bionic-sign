@@ -202,7 +202,16 @@ export async function exportFlattenedPdf(
 	const signal = options.signal;
 	throwIfAborted(signal);
 
-	const document = await PDFDocument.load(sourceBytes.slice());
+	let document: PDFDocument;
+	try {
+		document = await PDFDocument.load(sourceBytes.slice());
+	} catch (cause) {
+		if (cause instanceof BionicSignError) throw cause;
+		if (cause instanceof Error && cause.name === 'EncryptedPDFError') {
+			throw new BionicSignError('pdf-encrypted', 'The PDF is encrypted', { cause });
+		}
+		throw new BionicSignError('export-pdf-load', 'Failed to load PDF for export', { cause });
+	}
 	throwIfAborted(signal);
 	const pages = document.getPages();
 
@@ -293,7 +302,13 @@ export async function exportFlattenedPdf(
 	}
 
 	throwIfAborted(signal);
-	const output = await document.save();
+	let output: Uint8Array;
+	try {
+		output = await document.save();
+	} catch (cause) {
+		if (cause instanceof BionicSignError) throw cause;
+		throw new BionicSignError('export-pdf-save', 'Failed to save exported PDF', { cause });
+	}
 	throwIfAborted(signal);
 	return output;
 }

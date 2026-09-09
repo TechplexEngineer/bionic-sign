@@ -491,10 +491,10 @@ describe('exportFlattenedPdf', () => {
 	);
 
 	it.each([
-		[0, [1, 0, 0, 1, 50, 406.934], [1, 0, 0, 1, 50, 380], [1, 0, 0, 1, 0, 0]],
-		[90, [0, 1, -1, 0, 113.066, 170], [1, 0, 0, 1, 140, 190], [0, 1, -1, 0, 0, 0]],
-		[180, [-1, 0, 0, -1, 290, 253.066], [1, 0, 0, 1, 290, 280], [-1, 0, 0, -1, 0, 0]],
-		[270, [0, -1, 1, 0, 226.934, 490], [1, 0, 0, 1, 200, 470], [0, -1, 1, 0, 0, 0]]
+		[0, [1, 0, 0, 1, 32, 406.934], [1, 0, 0, 1, 32, 378], [1, 0, 0, 1, 0, 0]],
+		[90, [0, 1, -1, 0, 99.066, 170], [1, 0, 0, 1, 128, 186], [0, 1, -1, 0, 0, 0]],
+		[180, [-1, 0, 0, -1, 288, 253.066], [1, 0, 0, 1, 288, 282], [-1, 0, 0, -1, 0, 0]],
+		[270, [0, -1, 1, 0, 220.934, 490], [1, 0, 0, 1, 192, 474], [0, -1, 1, 0, 0, 0]]
 	] as const)(
 		'places text and signatures against the PDF.js-visible crop box on a %i-degree page',
 		async (rotation, expectedText, expectedImageTranslation, expectedImageRotation) => {
@@ -535,7 +535,7 @@ describe('exportFlattenedPdf', () => {
 				expectedImageTranslation.map((value) => expect.closeTo(value, 5))
 			);
 			expect(image[0][1]).toEqual(expectedImageRotation.map((value) => expect.closeTo(value, 5)));
-			expect(image[0][2]).toEqual([120, 0, 0, 60, 0, 0].map((value) => expect.closeTo(value, 5)));
+			expect(image[0][2]).toEqual([128, 0, 0, 64, 0, 0].map((value) => expect.closeTo(value, 5)));
 		}
 	);
 

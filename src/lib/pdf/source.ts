@@ -4,6 +4,23 @@ function isAbortError(reason: unknown): boolean {
 	return reason instanceof Error && reason.name === 'AbortError';
 }
 
+function combineSignals(signals: Array<AbortSignal | null | undefined>): AbortSignal | undefined {
+	const activeSignals = signals.filter((signal): signal is AbortSignal => signal != null);
+	if (activeSignals.length === 0) return undefined;
+	if (activeSignals.length === 1) return activeSignals[0];
+
+	const controller = new AbortController();
+	const abort = (signal: AbortSignal) => controller.abort(signal.reason);
+	for (const signal of activeSignals) {
+		if (signal.aborted) {
+			abort(signal);
+			break;
+		}
+		signal.addEventListener('abort', () => abort(signal), { once: true });
+	}
+	return controller.signal;
+}
+
 export async function loadPdfBytes(
 	source: PdfSource,
 	options: PdfLoadOptions = {}
@@ -16,10 +33,8 @@ export async function loadPdfBytes(
 		return new Uint8Array(source).slice();
 	}
 
-	const signal = options.signal ?? options.requestInit?.signal ?? undefined;
-	const requestInit = options.signal
-		? { ...options.requestInit, signal: options.signal }
-		: options.requestInit;
+	const signal = combineSignals([options.signal, options.requestInit?.signal]);
+	const requestInit = options.signal ? { ...options.requestInit, signal } : options.requestInit;
 
 	try {
 		const response = await fetch(source, requestInit);
