@@ -35,7 +35,7 @@ jobs:
         # package verification uses the deterministic server test project.
         run: npm run test:unit -- --run --project server
       - name: Build package tarball
-        run: npm pack --pack-destination "$RUNNER_TEMP/package"
+        run: mkdir -p "$RUNNER_TEMP/package" && npm pack --pack-destination "$RUNNER_TEMP/package"
       - name: Upload package artifact
         uses: actions/upload-artifact@v6
         with:
