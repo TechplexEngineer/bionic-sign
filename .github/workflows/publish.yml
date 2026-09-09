@@ -31,7 +31,9 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Test
-        run: npm test
+        # The browser project requires a separately installed Chromium binary;
+        # package verification uses the deterministic server test project.
+        run: npm run test:unit -- --run --project server
       - name: Build package tarball
         run: npm pack --pack-destination "$RUNNER_TEMP/package"
       - name: Upload package artifact
