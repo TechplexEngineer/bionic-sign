@@ -10,6 +10,8 @@ export interface PixelRect {
 export type PdfRect = PixelRect;
 
 export interface PdfPageDimensions {
+	x?: number;
+	y?: number;
 	width: number;
 	height: number;
 	rotation: 0 | 90 | 180 | 270;
@@ -50,29 +52,29 @@ export function normalizedToPdf(rect: FieldRect, page: PdfPageDimensions): PdfRe
 	switch (page.rotation) {
 		case 0:
 			return {
-				x: rect.x * width,
-				y: (1 - rect.y - rect.height) * height,
+				x: (page.x ?? 0) + rect.x * width,
+				y: (page.y ?? 0) + (1 - rect.y - rect.height) * height,
 				width: rect.width * width,
 				height: rect.height * height
 			};
 		case 90:
 			return {
-				x: rect.y * width,
-				y: rect.x * height,
+				x: (page.x ?? 0) + rect.y * width,
+				y: (page.y ?? 0) + rect.x * height,
 				width: rect.height * width,
 				height: rect.width * height
 			};
 		case 180:
 			return {
-				x: (1 - rect.x - rect.width) * width,
-				y: rect.y * height,
+				x: (page.x ?? 0) + (1 - rect.x - rect.width) * width,
+				y: (page.y ?? 0) + rect.y * height,
 				width: rect.width * width,
 				height: rect.height * height
 			};
 		case 270:
 			return {
-				x: (1 - rect.y - rect.height) * width,
-				y: (1 - rect.x - rect.width) * height,
+				x: (page.x ?? 0) + (1 - rect.y - rect.height) * width,
+				y: (page.y ?? 0) + (1 - rect.x - rect.width) * height,
 				width: rect.height * width,
 				height: rect.width * height
 			};

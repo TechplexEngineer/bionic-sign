@@ -96,12 +96,12 @@ function assertValueType(field: FormField, value: unknown): void {
 }
 
 function pageDimensions(page: ReturnType<PDFDocument['getPage']>): PdfPageDimensions {
-	const { width, height } = page.getSize();
+	const { x, y, width, height } = page.getCropBox();
 	const angle = ((page.getRotation().angle % 360) + 360) % 360;
 	if (angle !== 0 && angle !== 90 && angle !== 180 && angle !== 270) {
 		throw new RangeError(`Unsupported PDF page rotation: ${angle}`);
 	}
-	return { width, height, rotation: angle };
+	return { x, y, width, height, rotation: angle };
 }
 
 function visualFieldFrame(
