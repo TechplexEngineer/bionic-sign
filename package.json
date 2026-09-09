@@ -1,6 +1,22 @@
 {
-	"name": "bionic-sign",
+	"name": "@techplexengineer/bionic-sign",
 	"version": "0.0.1",
+	"description": "Backend-agnostic Svelte 5 components for designing and filling PDF forms with signatures.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/TechplexEngineer/bionic-sign.git"
+	},
+	"bugs": {
+		"url": "https://github.com/TechplexEngineer/bionic-sign/issues"
+	},
+	"homepage": "https://github.com/TechplexEngineer/bionic-sign#readme",
+	"license": "MIT",
+	"engines": {
+		"node": ">=22.14.0"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",

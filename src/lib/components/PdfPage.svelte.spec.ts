@@ -172,9 +172,7 @@ describe('PdfPage', () => {
 		renderGate.reject(cause);
 
 		await vi.waitFor(() => expect(onerror).toHaveBeenCalledOnce());
-		expect(onerror).toHaveBeenCalledWith(
-			expect.objectContaining({ code: 'pdf-render', cause })
-		);
+		expect(onerror).toHaveBeenCalledWith(expect.objectContaining({ code: 'pdf-render', cause }));
 	});
 
 	it('suppresses every late renderer failure after cleanup', async () => {

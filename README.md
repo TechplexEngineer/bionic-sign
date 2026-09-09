@@ -8,15 +8,15 @@ Bionic Sign is a backend-agnostic Svelte 5 library for placing text and signatur
 ## Install
 
 ```sh
-npm install bionic-sign
+npm install @techplexengineer/bionic-sign
 ```
 
 Import the packaged theme once, then place components inside the `.bionic-sign` scope:
 
 ```svelte
 <script lang="ts">
-	import 'bionic-sign/styles.css';
-	import { PdfFormFiller } from 'bionic-sign';
+	import '@techplexengineer/bionic-sign/styles.css';
+	import { PdfFormFiller } from '@techplexengineer/bionic-sign';
 </script>
 
 <div class="bionic-sign">
@@ -47,7 +47,7 @@ For locally selected or previously downloaded bytes, no fetch is performed:
 
 ```svelte
 <script lang="ts">
-	import { PdfFormDesigner, type PdfSource } from 'bionic-sign';
+	import { PdfFormDesigner, type PdfSource } from '@techplexengineer/bionic-sign';
 
 	let source = $state<PdfSource>();
 
@@ -71,7 +71,11 @@ Byte sources are copied before use. Passing `requestInit` with a byte source has
 
 ```svelte
 <script lang="ts">
-	import { PdfFormDesigner, type FormDefinition, type PdfFormDesignerHandle } from 'bionic-sign';
+	import {
+		PdfFormDesigner,
+		type FormDefinition,
+		type PdfFormDesignerHandle
+	} from '@techplexengineer/bionic-sign';
 
 	let designer: PdfFormDesignerHandle;
 	let definition = $state<FormDefinition>({ version: 1, fields: [] });
@@ -144,7 +148,7 @@ Text prefills are matched by field name, remain editable, and never apply to sig
 		type FormSubmission,
 		type PdfFormFillerHandle,
 		type ValidationResult
-	} from 'bionic-sign';
+	} from '@techplexengineer/bionic-sign';
 
 	let filler: PdfFormFillerHandle;
 
@@ -238,7 +242,12 @@ The returned PDF is a new byte array with completed values visually flattened in
 Schema helpers are available from the package root:
 
 ```ts
-import { applyTextPrefill, cloneDefinition, nextFieldName, validateDefinition } from 'bionic-sign';
+import {
+	applyTextPrefill,
+	cloneDefinition,
+	nextFieldName,
+	validateDefinition
+} from '@techplexengineer/bionic-sign';
 
 const parsed = validateDefinition(JSON.parse(savedJson));
 const copy = cloneDefinition(parsed);
@@ -285,7 +294,7 @@ Keep authorization, access control, retention, malware scanning, consent records
 
 ## Theming
 
-Import `bionic-sign/styles.css`, wrap the relevant UI in `.bionic-sign`, and override custom properties directly on that scope (for example, by adding a host class to the same element). The packaged defaults are declared on `.bionic-sign`, so setting tokens only on a separate ancestor does not override them. All selectors in the packaged stylesheet stay below `.bionic-sign`; it does not reset document-wide styles or remove focus outlines.
+Import `@techplexengineer/bionic-sign/styles.css`, wrap the relevant UI in `.bionic-sign`, and override custom properties directly on that scope (for example, by adding a host class to the same element). The packaged defaults are declared on `.bionic-sign`, so setting tokens only on a separate ancestor does not override them. All selectors in the packaged stylesheet stay below `.bionic-sign`; it does not reset document-wide styles or remove focus outlines.
 
 ```css
 .contract-signing {
