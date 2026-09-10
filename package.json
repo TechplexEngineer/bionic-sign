@@ -1,6 +1,6 @@
 {
 	"name": "@team4909/bionic-sign",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Backend-agnostic Svelte 5 components for designing and filling PDF forms with signatures.",
 	"repository": {
 		"type": "git",
