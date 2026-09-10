@@ -1,5 +1,5 @@
 {
-	"name": "@techplexengineer/bionic-sign",
+	"name": "@team4909/bionic-sign",
 	"version": "0.0.1",
 	"description": "Backend-agnostic Svelte 5 components for designing and filling PDF forms with signatures.",
 	"repository": {
