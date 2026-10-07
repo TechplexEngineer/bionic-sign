@@ -4,9 +4,9 @@ import type { FieldRect, FormDefinition, FormField } from '../types.js';
 export const MIN_FIELD_SIZE = 0.02;
 
 const DEFAULT_FIELD_RECTS: Record<FormField['type'], FieldRect> = {
-	text: { x: 0.1, y: 0.1, width: 0.3, height: 0.1 },
-	dropdown: { x: 0.1, y: 0.1, width: 0.3, height: 0.1 },
-	signature: { x: 0.1, y: 0.1, width: 0.3, height: 0.15 }
+	text: { x: 0.1, y: 0.1, width: 0.3, height: 0.03 },
+	dropdown: { x: 0.1, y: 0.1, width: 0.3, height: 0.03 },
+	signature: { x: 0.1, y: 0.1, width: 0.3, height: 0.03 }
 };
 
 function assertFiniteRect(rect: FieldRect): void {

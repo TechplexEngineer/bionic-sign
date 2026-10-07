@@ -40,7 +40,15 @@ describe('designer state commands', () => {
 		expect(first.fields[1].id).not.toBe('');
 		expect(second.fields[2].name).toBe('text_3');
 		expect(second.fields[2].id).not.toBe(first.fields[1].id);
+		expect(first.fields[1].rect.height).toBe(0.03);
 		expect(original).toEqual(definition(field('existing', 'text_1')));
+	});
+
+	it('defaults every field type to normalized height 0.03', () => {
+		for (const type of ['text', 'dropdown', 'signature'] as const) {
+			const added = addField(definition(), type, 1);
+			expect(added.fields[0].rect.height).toBe(0.03);
+		}
 	});
 
 	it('adds dropdown fields with a configurable default option', () => {
