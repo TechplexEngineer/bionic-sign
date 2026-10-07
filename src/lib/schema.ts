@@ -81,13 +81,31 @@ function readField(value: unknown, index: number): FormField {
 	}
 
 	const rect = readRect(value.rect, name);
+	const placeholder =
+		value.placeholder === undefined
+			? undefined
+			: readString(value.placeholder, `Field "${name}" placeholder`);
+	if (placeholder !== undefined && placeholder.length === 0) {
+		throw new TypeError(`Field "${name}" placeholder must not be empty`);
+	}
 	if (value.type === 'text') {
-		return { id, name, type: 'text', page, rect, required };
+		return { id, name, type: 'text', page, rect, required, ...(placeholder ? { placeholder } : {}) };
 	}
 	if (value.type === 'signature') {
-		return { id, name, type: 'signature', page, rect, required };
+		return {
+			id,
+			name,
+			type: 'signature',
+			page,
+			rect,
+			required,
+			...(placeholder ? { placeholder } : {})
+		};
 	}
 	if (value.type === 'dropdown') {
+		if (placeholder !== undefined) {
+			throw new TypeError(`Field "${name}" dropdown must not have a placeholder`);
+		}
 		if (!Array.isArray(value.options) || value.options.length === 0) {
 			throw new TypeError(`Field "${name}" dropdown options must be a non-empty array`);
 		}

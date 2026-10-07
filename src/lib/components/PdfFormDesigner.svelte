@@ -7,6 +7,7 @@
 		renameField,
 		toggleRequired,
 		updateDropdownOptions,
+		updateFieldPlaceholder,
 		updateFieldRect
 	} from '../designer/state.js';
 	import { cloneDefinition, validateDefinition } from '../schema.js';
@@ -57,6 +58,9 @@
 	let designerElement = $state<HTMLDivElement>();
 	let selectedField = $derived(localDefinition.fields.find(({ id }) => id === selectedFieldId));
 	let nameDraft = $derived(selectedField?.name ?? '');
+	let placeholderDraft = $derived(
+		selectedField && selectedField.type !== 'dropdown' ? (selectedField.placeholder ?? '') : ''
+	);
 	let optionsDraft = $derived(
 		selectedField?.type === 'dropdown' ? selectedField.options.join('\n') : ''
 	);
@@ -64,6 +68,8 @@
 	$effect(() => {
 		const storedName = selectedField?.name ?? '';
 		nameDraft = storedName;
+		placeholderDraft =
+			selectedField && selectedField.type !== 'dropdown' ? (selectedField.placeholder ?? '') : '';
 		fieldNameError = undefined;
 		optionsDraft = selectedField?.type === 'dropdown' ? selectedField.options.join('\n') : '';
 		optionsError = undefined;
@@ -149,6 +155,14 @@
 				...selectedField.rect,
 				[property]: value
 			})
+		);
+	}
+
+	function editPlaceholder(event: Event): void {
+		if (!selectedField || selectedField.type === 'dropdown') return;
+		placeholderDraft = (event.currentTarget as HTMLInputElement).value;
+		commitDefinition(
+			updateFieldPlaceholder(localDefinition, selectedField.id, placeholderDraft)
 		);
 	}
 
@@ -327,6 +341,16 @@
 					</label>
 					{#if fieldNameError}
 						<p class="field-error" role="alert">{fieldNameError}</p>
+					{/if}
+					{#if selectedField.type !== 'dropdown'}
+						<label>
+							Placeholder
+							<input
+								value={placeholderDraft}
+								placeholder={selectedField.name}
+								oninput={editPlaceholder}
+							/>
+						</label>
 					{/if}
 					{#if selectedField.type === 'dropdown'}
 						<label>

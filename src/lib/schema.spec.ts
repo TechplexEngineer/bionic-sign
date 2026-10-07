@@ -29,6 +29,28 @@ describe('validateDefinition', () => {
 		expect(validateDefinition({ version: 1, fields: [] })).toEqual({ version: 1, fields: [] });
 	});
 
+	it('preserves optional placeholders on text and signature fields', () => {
+		const text = { ...field('text-id', 'student_name'), placeholder: 'Student name' };
+		const signature = {
+			...field('signature-id', 'parent_signature', 'signature'),
+			placeholder: 'Parent signs here'
+		};
+
+		expect(validateDefinition({ version: 1, fields: [text, signature] }).fields).toEqual([
+			text,
+			signature
+		]);
+	});
+
+	it('rejects placeholders on dropdown fields', () => {
+		expect(() =>
+			validateDefinition({
+				version: 1,
+				fields: [{ ...field('grade-id', 'grade', 'dropdown'), placeholder: 'Choose grade' }]
+			})
+		).toThrow(/placeholder/i);
+	});
+
 	it('rejects duplicate field names', () => {
 		expect(() =>
 			validateDefinition({

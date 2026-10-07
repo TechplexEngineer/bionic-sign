@@ -26,10 +26,12 @@ interface BaseField {
 
 export interface TextField extends BaseField {
 	type: 'text';
+	placeholder?: string;
 }
 
 export interface SignatureField extends BaseField {
 	type: 'signature';
+	placeholder?: string;
 }
 
 export interface DropdownField extends BaseField {

@@ -224,6 +224,31 @@ describe('PdfFormDesigner', () => {
 			.toBeVisible();
 	});
 
+	it('configures optional placeholders for text and signature fields', async () => {
+		usePdf();
+		const emitted: FormDefinition[] = [];
+		render(PdfFormDesigner, {
+			source: new Uint8Array([1]),
+			definition: definition(),
+			ondefinitionchange: (next) => emitted.push(next)
+		});
+
+		await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+		await expect
+			.element(page.getByRole('textbox', { name: 'Placeholder' }))
+			.toHaveAttribute('placeholder', 'student_name');
+		await page.getByRole('textbox', { name: 'Placeholder' }).fill('Student name');
+		expect(emitted.at(-1)?.fields[0]).toEqual(
+			expect.objectContaining({ placeholder: 'Student name' })
+		);
+
+		await page.getByRole('textbox', { name: 'Placeholder' }).fill('');
+		expect(emitted.at(-1)?.fields[0]).not.toHaveProperty('placeholder');
+
+		await page.getByRole('button', { name: 'Signature field "parent_signature"' }).click();
+		await expect.element(page.getByRole('textbox', { name: 'Placeholder' })).toBeVisible();
+	});
+
 	it('adds a dropdown and configures its string options', async () => {
 		usePdf();
 		const changes: FormDefinition[] = [];
