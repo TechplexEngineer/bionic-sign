@@ -1,6 +1,6 @@
 import { createRawSnippet } from 'svelte';
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { FormDefinition } from '../types.js';
@@ -243,6 +243,56 @@ describe('PdfFormDesigner', () => {
 				options: ['Freshman', 'Sophomore']
 			})
 		);
+	});
+
+	it.each(['Control', 'Meta'] as const)(
+		'copies and pastes the selected field with %s shortcuts onto the current page',
+		async (modifier) => {
+			usePdf();
+			const changes: FormDefinition[] = [];
+			render(PdfFormDesigner, {
+				source: new Uint8Array([1]),
+				definition: definition(),
+				ondefinitionchange: (next) => changes.push(structuredClone(next))
+			});
+
+			await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+			await page.getByRole('button', { name: 'Page 2' }).click();
+			await userEvent.keyboard(`{${modifier}>}c{/${modifier}}`);
+			await userEvent.keyboard(`{${modifier}>}v{/${modifier}}`);
+
+			await expect
+				.element(page.getByRole('button', { name: 'Text field "student_name_2"' }))
+				.toBeVisible();
+			expect(changes.at(-1)?.fields.at(-1)).toEqual({
+				id: expect.any(String),
+				name: 'student_name_2',
+				type: 'text',
+				page: 2,
+				rect: expect.objectContaining({ width: 0.3, height: 0.1 }),
+				required: true
+			});
+			expect(changes.at(-1)?.fields.at(-1)?.rect.x).toBeCloseTo(0.12);
+			expect(changes.at(-1)?.fields.at(-1)?.rect.y).toBeCloseTo(0.22);
+		}
+	);
+
+	it('leaves native copy and paste shortcuts alone while editing field properties', async () => {
+		usePdf();
+		const changes: FormDefinition[] = [];
+		render(PdfFormDesigner, {
+			source: new Uint8Array([1]),
+			definition: definition(),
+			ondefinitionchange: (next) => changes.push(structuredClone(next))
+		});
+
+		await page.getByRole('button', { name: 'Text field "student_name"' }).click();
+		const nameInput = page.getByRole('textbox', { name: 'Name' });
+		await nameInput.click();
+		await userEvent.keyboard('{Control>}c{/Control}');
+		await userEvent.keyboard('{Control>}v{/Control}');
+
+		expect(changes).toHaveLength(0);
 	});
 
 	it('edits every property, rejects duplicate names inline, deletes, and preserves geometry across zoom', async () => {
