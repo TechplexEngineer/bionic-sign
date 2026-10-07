@@ -5,6 +5,7 @@ import {
 	addField,
 	constrainMovedFieldRect,
 	deleteField,
+	duplicateField,
 	renameField,
 	toggleRequired,
 	updateDropdownOptions,
@@ -53,6 +54,45 @@ describe('designer state commands', () => {
 				options: ['Option 1']
 			})
 		);
+	});
+
+	it('duplicates a field with a new ID, next numbered name, target page, and offset geometry', () => {
+		const original = definition(
+			field('guardian-id', 'guardian_name', {
+				type: 'dropdown',
+				page: 1,
+				required: false,
+				options: ['Parent', 'Guardian']
+			})
+		);
+
+		const duplicated = duplicateField(original, original.fields[0], 2);
+
+		expect(duplicated.fields[1]).toEqual({
+			id: expect.any(String),
+			name: 'guardian_name_2',
+			type: 'dropdown',
+			page: 2,
+			rect: expect.objectContaining({ width: 0.3, height: 0.1 }),
+			required: false,
+			options: ['Parent', 'Guardian']
+		});
+		expect(original.fields).toHaveLength(1);
+		expect(duplicated.fields[1].id).not.toBe(original.fields[0].id);
+		expect(duplicated.fields[1].rect.x).toBeCloseTo(0.12);
+		expect(duplicated.fields[1].rect.y).toBeCloseTo(0.22);
+	});
+
+	it('uses the next free numeric suffix when duplicating a field repeatedly', () => {
+		const original = definition(
+			field('guardian-id', 'guardian_name'),
+			field('existing-copy', 'guardian_name_2'),
+			field('another-copy', 'guardian_name_3')
+		);
+
+		const duplicated = duplicateField(original, original.fields[0], 1);
+
+		expect(duplicated.fields.at(-1)?.name).toBe('guardian_name_4');
 	});
 
 	it('updates dropdown options without mutating the input definition', () => {

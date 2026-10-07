@@ -96,6 +96,31 @@ export function addField(
 	return validateDefinition({ version: 1, fields: [...definition.fields, field] });
 }
 
+export function duplicateField(
+	definition: FormDefinition,
+	field: FormField,
+	page: number
+): FormDefinition {
+	const existingNames = new Set(definition.fields.map((candidate) => candidate.name));
+	let suffix = 2;
+	while (existingNames.has(`${field.name}_${suffix}`)) suffix += 1;
+
+	const copy: FormField = {
+		...field,
+		id: globalThis.crypto.randomUUID(),
+		name: `${field.name}_${suffix}`,
+		page,
+		rect: constrainMovedFieldRect({
+			...field.rect,
+			x: field.rect.x + 0.02,
+			y: field.rect.y + 0.02
+		}),
+		...(field.type === 'dropdown' ? { options: [...field.options] } : {})
+	};
+
+	return validateDefinition({ version: 1, fields: [...definition.fields, copy] });
+}
+
 export function renameField(definition: FormDefinition, id: string, name: string): FormDefinition {
 	return updateField(definition, id, (field) => ({ ...field, name }));
 }

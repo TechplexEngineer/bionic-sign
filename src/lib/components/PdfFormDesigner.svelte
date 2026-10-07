@@ -3,6 +3,7 @@
 	import {
 		addField,
 		deleteField,
+		duplicateField,
 		renameField,
 		toggleRequired,
 		updateDropdownOptions,
@@ -48,10 +49,12 @@
 	let pageCount = $state(1);
 	let zoom = $state(1);
 	let selectedFieldId = $state<string>();
+	let copiedField = $state<FormField>();
 	let fieldsPanelOpen = $state(false);
 	let propertiesPanelOpen = $state(false);
 	let fieldNameError = $state<string>();
 	let optionsError = $state<string>();
+	let designerElement = $state<HTMLDivElement>();
 	let selectedField = $derived(localDefinition.fields.find(({ id }) => id === selectedFieldId));
 	let nameDraft = $derived(selectedField?.name ?? '');
 	let optionsDraft = $derived(
@@ -182,7 +185,36 @@
 	function zoomBy(delta: number): void {
 		zoom = Math.min(4, Math.max(0.25, zoom + delta));
 	}
+
+	function handleKeydown(event: KeyboardEvent): void {
+		if ((!event.ctrlKey && !event.metaKey) || event.altKey || event.shiftKey) return;
+		const key = event.key.toLowerCase();
+		if (key !== 'c' && key !== 'v') return;
+
+		const target = event.target;
+		if (!(target instanceof Node) || !designerElement?.contains(target)) return;
+		if (
+			target instanceof HTMLElement &&
+			(target.isContentEditable ||
+				target.closest('input, textarea, select, [contenteditable="true"]'))
+		) {
+			return;
+		}
+
+		if (key === 'c' && selectedField) {
+			copiedField = structuredClone(selectedField);
+			event.preventDefault();
+		} else if (key === 'v' && copiedField) {
+			const next = duplicateField(localDefinition, copiedField, currentPage);
+			const pasted = next.fields.at(-1)!;
+			commitDefinition(next);
+			selectField(pasted.id);
+			event.preventDefault();
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 {#snippet fieldLayer(context: { page: number; width: number; height: number })}
 	{#each localDefinition.fields.filter((field) => field.page === context.page) as field (field.id)}
@@ -198,7 +230,7 @@
 	{/each}
 {/snippet}
 
-<div class="pdf-form-designer">
+<div class="pdf-form-designer" bind:this={designerElement}>
 	<header class="designer-toolbar" aria-label="Designer toolbar">
 		<div class="drawer-controls">
 			<button
